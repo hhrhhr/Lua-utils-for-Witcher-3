@@ -8,7 +8,7 @@ BinaryReader = {
 function BinaryReader:open(fullpath)
     self.f_handle = assert(io.open(fullpath, "rb"))
     self.f_size = self.f_handle:seek("end")
-    assert(-1 == self.f_size, "your Lua doesn't support files larger than 2 Gb")
+    assert(-1 ~= self.f_size, "your Lua doesn't support files larger than 2 Gb")
     self.f_handle:seek("set")
 end
 

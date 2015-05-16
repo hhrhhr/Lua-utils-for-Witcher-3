@@ -11,7 +11,7 @@ r:jmp("end", -20)
 local texture_num = r:uint32()
 local block2_size = r:uint32()      -- names
 local block1_size = r:uint32()      -- * 4 bytes
-assert(1415070536 == r:uint32())    -- HCXT ???
+assert(1415070536 == r:uint32())    -- "HCXT"
 assert(6 == r:uint32())             -- ???
 -- EOF
 
@@ -29,7 +29,7 @@ for i = 1, block1_size do
     --io.write(value)
     --io.write("\t")
 end
---io.write("\n")
+io.write("\n")
 
 
 local block2 = {}   -- filenames
@@ -37,9 +37,9 @@ local pos = r:pos()
 for i = 1, texture_num do
     local str = r:str()
     table.insert(block2, str)
---    io.write(string.format("%4d: %s\n", i, str))
+    io.write(string.format("%4d: %s\n", i, str))
 end
---io.write("\n")
+io.write("\n")
 assert(pos + block2_size == r:pos())
 
 
@@ -49,20 +49,20 @@ for i = 1, texture_num do
     t[1] = r:hex32()    -- number (unique???)
     t[2] = r:uint32()   -- filename, start offset in block2
     t[3] = r:uint32()   -- * 4096 = start offset, first chunk
-    t[4] = r:uint32()   -- packed size (all cunks)
+    t[4] = r:uint32()   -- packed size (all chunks)
     t[5] = r:uint32()   -- unpacked size
     t[6] = r:uint32()   -- bpp? always 16
     t[7] = r:uint16()   -- width
     t[8] = r:uint16()   -- height
     t[9] = r:uint16()   -- mips
-    t[10] = r:uint16()  -- 1/6, cubemaps?
+    t[10] = r:uint16()  -- 1 - tex2D, 6 - cubemaps, ... - layers?
     t[11] = r:uint32()  -- offset in block1, second packed chunk
-    t[12] = r:uint32()  -- number left packed chunks
-    t[13] = r:hex32()   -- zero???
-    t[14] = r:hex32()   -- zero???
-    t[15] = r:uint8()   -- 7-DXT1, 8-DXT5, 253-???
+    t[12] = r:uint32()  -- the number of remaining packed chunks
+    t[13] = r:hex32()   -- ???
+    t[14] = r:hex32()   -- ???
+    t[15] = r:uint8()   -- 7-DXT1, 8-DXT5, 253-RGBA?, 0-16bit?
     t[16] = r:uint8()   -- 4/3 ???
-    t[17] = r:uint16()
+    t[17] = r:uint16()  -- zero
     table.insert(block3, t)
     io.write(
         string.format("%4d, %s, %4d, %5d, %8d, %8d, %2d, %4d, %4d, %2d, %2d, %3d, %d, %s%s, %3d, %d, %d",
