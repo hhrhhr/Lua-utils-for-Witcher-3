@@ -1,9 +1,9 @@
 assert(_VERSION == "Lua 5.3")
 
--- DDS header       [19]
+-- DDS header       [32]
 _fourcc  = 1;    _size    = 2;    _flags   = 3;    _height  = 4
 _width   = 5;    _pitch   = 6;    _depth   = 7;    _mipmaps = 8
---_reserved
+-- reserved         [44]
 --  9 10 11 12
 -- 13 14 15 16
 -- 17 18 19
@@ -20,11 +20,9 @@ _reserved   = 37
 
 
 local function MAKEFOURCC(fourcc)
-    local a = string.byte(string.sub(fourcc, 1, 1))
-    local b = string.byte(string.sub(fourcc, 2, 2))
-    local c = string.byte(string.sub(fourcc, 3, 3))
-    local d = string.byte(string.sub(fourcc, 4, 4))
-    return a | (b << 8) | (c << 16) | (d << 24)
+--    local a, b, c, d = string.byte(fourcc, 1, 4)
+--    return a | (b << 8) | (c << 16) | (d << 24)
+    return string.unpack("<L", fourcc)
 end
 
 FOURCC_DDS  = MAKEFOURCC("DDS ")
@@ -102,13 +100,13 @@ function DDSHeader:new()
     self[_pitch]    = 0
     self[_depth]    = 0
     self[_mipmaps]  = 0
-    
-    for i = 9, 9+11 do
+    -- reserved
+    for i = 9, 17 do
         self[i]     = 0
     end
-    self[8+10]        = MAKEFOURCC("_LUA")
-    self[8+11]        = MAKEFOURCC("_DDS")
-    --
+    self[18]        = MAKEFOURCC("_LUA")
+    self[19]        = MAKEFOURCC("_DDS")
+    -- pixel format
     self[_psize]    = 32
     self[_pflags]   = 0
     self[_pfourcc]  = 0
@@ -117,13 +115,13 @@ function DDSHeader:new()
     self[_pgmask]   = 0
     self[_pbmask]   = 0
     self[_pamask]   = 0
-    --
+    -- caps
     self[_caps1]    = DDSCAPS_TEXTURE
     self[_caps2]    = 0
     self[_caps3]    = 0
     self[_caps4]    = 0
     self[_notused]  = 0
-    --
+    -- d3d10
     self[_dxgiFmt]  = DXGI_FORMAT_UNKNOWN
     self[_resDim]   = D3D10_RESOURCE_DIMENSION_UNKNOWN
     self[_miscFlag] = 0
@@ -144,7 +142,7 @@ end
 
 function DDSHeader:set_depth(num)
     self[_flags] = self[_flags] | DDSD_DEPTH
-    self[_height] = num
+    self[_depth] = num
 end
 
 function DDSHeader:set_mipmaps(num)
@@ -162,18 +160,22 @@ function DDSHeader:set_mipmaps(num)
     end
 end
 
-function DDSHeader:set_cubemaps(num)
-    if num == 6 then
-        self[_caps1] = self[_caps1]| DDSCAPS_COMPLEX
-        self[_caps2] = DDSCAPS2_CUBEMAP | DDSCAPS2_CUBEMAP_ALL_FACES
-        self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE2D
-        self[_arraySize] = 6
-    elseif num == 1 then
-        self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE2D
-    else
-        -- TODO: process texture arrays
-        self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE2D
-    end
+function DDSHeader:set_texture_2d()
+    self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE2D
+end
+
+function DDSHeader:set_texture_3d()
+    self[_caps2] = DDSCAPS2_VOLUME
+    
+    self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE3D
+end
+
+function DDSHeader:set_texture_cube()
+    self[_caps1] = self[_caps1]| DDSCAPS_COMPLEX
+    self[_caps2] = DDSCAPS2_CUBEMAP | DDSCAPS2_CUBEMAP_ALL_FACES
+    
+    self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE2D
+    self[_arraySize] = 6
 end
 
 function DDSHeader:set_linear(size)
@@ -264,49 +266,52 @@ end
 -------------------------------------------------------------------------------
 
 local function computePitch(width, bpp)
-    local pitch = width * ((bpp + 7) // 8)
-    return ((pitch + 3) // 4 * 4)
+    local pitch = (bpp + 7) // 8 * width
+    return (pitch + 3) // 4 * 4
 end
 
+
+local BS = { 8, 8, 16, 16, 16, 8, 16 }
+
 local function blockSize(fmt)
-    if (fmt == Format_DXT1 or fmt == Format_DXT1a) then
-        return 8
-    elseif (fmt == Format_DXT3) then
-        return 16
-    elseif (fmt == Format_DXT5 or fmt == Format_DXT5n) then
-        return 16
-    elseif (fmt == Format_BC4) then
-        return 8
-    elseif (fmt == Format_BC5) then
-        return 16
-    end
-    return 0
+    return BS[fmt] or 0
 end
 
 local function computeImageSize(width, height, depth, bpp, fmt)
     if fmt == Format_RGBA then
-        return depth * height * computePitch(width, bpp)
+        return computePitch(width, bpp) * depth * height
     else
-        return ((width + 3) // 4 * ((height + 3) // 4) * blockSize(fmt))
+        return blockSize(fmt) * ((width + 3) // 4) * ((height + 3) // 4)
     end
 end
 
 -------------------------------------------------------------------------------
 
 function DDSHeader:generate(width, height, mips, fmt, bpp, cubemap, depth, normal)
-    width   = width or 256
-    height  = height or 256
-    mips    = mips or 1
-    fmt     = fmt or Format_DXT1
-    bpp     = bpp or 16
-    cubemap = cubemap or 1
-    depth   = depth or 0
-    normal  = normal or false
+    width   = width     or 256
+    height  = height    or 256
+    mips    = mips      or 1
+    fmt     = fmt       or Format_DXT1
+    bpp     = bpp       or 16
+    cubemap = cubemap   or false
+    depth   = depth     or 0
+    normal  = normal    or false
     
     self:set_width(width)
     self:set_height(height)
+    self:set_depth(depth)
     self:set_mipmaps(mips)
-    self:set_cubemaps(cubemap)
+    
+    if depth > 0 then
+        self:set_texture_3d()
+    else
+        self:set_texture_2d()        
+    end
+    
+    if cubemap then
+        self:set_texture_cube()
+    end
+        
     if fmt == Format_RGBA then
         self:set_pitch(computePitch(width, bpp))
         self:set_pixel_format(bpp)  -- ...rmask, gmask, bmask, amask
@@ -338,11 +343,7 @@ function DDSHeader:generate(width, height, mips, fmt, bpp, cubemap, depth, norma
     end
     
     local data = {}
-
     for i = 1, header_size do
---        io.write(tostring(self[i]))
---        io.write("\t")
---        if (i % 4) == 0 then io.write("\n") end
         table.insert(data, string.pack("<L", self[i]))
     end
     return table.concat(data)
