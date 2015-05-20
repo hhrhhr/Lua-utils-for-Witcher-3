@@ -55,14 +55,14 @@ for i = 1, texture_num do
     t[7] = r:uint16()   -- width
     t[8] = r:uint16()   -- height
     t[9] = r:uint16()   -- mips
-    t[10] = r:uint16()  -- 1 - tex2D, 6 - cubemaps, ... - layers?
+    t[10] = r:uint16()  -- 1/6/N, single, cubemaps, arrays
     t[11] = r:uint32()  -- offset in block1, second packed chunk
     t[12] = r:uint32()  -- the number of remaining packed chunks
     t[13] = r:hex32()   -- ???
     t[14] = r:hex32()   -- ???
-    t[15] = r:uint8()   -- 7-DXT1, 8-DXT5, 253-RGBA?, 0-16bit?
-    t[16] = r:uint8()   -- 4/3 ???
-    t[17] = r:uint16()  -- zero
+    t[15] = r:uint8()   -- 0-RGBA?, 7-DXT1, 8-DXT5, 10-???, 13-DXT3, 14-ATI1, 15-???, 253-???
+    t[16] = r:uint8()   -- 3-cubemaps, 4-texture
+    t[17] = r:uint16()  -- 0/1 ???
     table.insert(block3, t)
     io.write(
         string.format("%4d, %s, %4d, %5d, %8d, %8d, %2d, %4d, %4d, %2d, %2d, %3d, %d, %s%s, %3d, %d, %d",
