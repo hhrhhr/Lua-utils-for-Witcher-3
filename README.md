@@ -33,9 +33,9 @@ textures: 6; filename buffer: 337; chunks: 24
 
 #### unpack_textures.lua
 ````
-lua unpack_textures.lua path_to_texture.cache [output_dir]
+lua unpack_textures.lua path_to_texture.cache [output_dir [mips]]
 ````
-распаковка текстур и дописывание к ним необходимого DDS-заголовка. пока что *texture arrays* (многослойные текстуры), куча мелких *enviroment cubemaps* и часть других картинок (в основном относящиеся к игровому журналу) пропускаются.
+распаковка текстур и дописывание к ним необходимого DDS-заголовка. без указания опции *mips* достается только первый mip-уровень. почти все *cubemaps* пропускаются из-за бесполезности, можно это дело закоментировать (искать строку ````-- skip tonns of envprobes````)
 вывод примерно такой:
 ````
 textures: 6; filename buffer: 337; chunks: 24
@@ -47,7 +47,7 @@ start unpacking...
 1/6: environment#decorations#exterior#crystal#texture#crystal.xbm
 ...OK
 2/6: environment#decorations#exterior#crystal#texture#crystal_n.xbm
-...OK
+SKIP
 3/6: fx#textures#explode#explode_smoke_10.xbm
 .......OK
 -- skipped --
