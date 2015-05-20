@@ -7,6 +7,12 @@
 
 ### инструкции ;)
 
+#### inspect_w3strings.lua
+````
+lua inspect_w3strings.lua path_to.w3.strings [output_dir]
+````
+попытка разбора локализации. результат записывается в файл ````strings_utf16le.txt````. локализации *ar|br|esMX* не зашифрованы, что может помочь в дальнейшем анализе.
+
 #### inspect_textures.lua
 ````
 lua inspect_textures.lua path_to_texture.cache
