@@ -22,7 +22,7 @@ _reserved   = 37
 local function MAKEFOURCC(fourcc)
 --    local a, b, c, d = string.byte(fourcc, 1, 4)
 --    return a | (b << 8) | (c << 16) | (d << 24)
-    return string.unpack("<L", fourcc)
+    return string.unpack("<I", fourcc)
 end
 
 FOURCC_DDS  = MAKEFOURCC("DDS ")
@@ -66,8 +66,8 @@ DDSD_DEPTH          = 0x00800000
 
 DDSCAPS_COMPLEX     = 0x00000008
 DDSCAPS_TEXTURE     = 0x00001000
-DDSCAPS2_VOLUME     = 0x00200000
 DDSCAPS_MIPMAP      = 0x00400000
+DDSCAPS2_VOLUME     = 0x00200000
 DDSCAPS2_CUBEMAP    = 0x00000200
 DDSCAPS2_CUBEMAP_ALL_FACES = 0x0000FC00
 
@@ -166,14 +166,14 @@ end
 
 function DDSHeader:set_texture_3d()
     self[_caps2] = DDSCAPS2_VOLUME
-    
+
     self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE3D
 end
 
 function DDSHeader:set_texture_cube()
     self[_caps1] = self[_caps1]| DDSCAPS_COMPLEX
     self[_caps2] = DDSCAPS2_CUBEMAP | DDSCAPS2_CUBEMAP_ALL_FACES
-    
+
     self[_resDim] = D3D10_RESOURCE_DIMENSION_TEXTURE2D
     self[_arraySize] = 6
 end
@@ -296,25 +296,32 @@ function DDSHeader:generate(width, height, mips, fmt, bpp, cubemap, depth, norma
     cubemap = cubemap   or false
     depth   = depth     or 0
     normal  = normal    or false
-    
+
     self:set_width(width)
     self:set_height(height)
-    self:set_depth(depth)
     self:set_mipmaps(mips)
-    
+
     if depth > 0 then
+        self:set_depth(depth)
         self:set_texture_3d()
     else
-        self:set_texture_2d()        
+        self:set_texture_2d()
     end
-    
+
     if cubemap then
         self:set_texture_cube()
     end
-        
+
     if fmt == Format_RGBA then
         self:set_pitch(computePitch(width, bpp))
-        self:set_pixel_format(bpp)  -- ...rmask, gmask, bmask, amask
+        if bpp == 8 then
+            self:set_pixel_format(bpp, 0x0f00, 0x00f0, 0x000f, 0xf000)
+        elseif bpp == 16 then
+            -- TODO: check this
+            self:set_pixel_format(bpp, 0x03f000, 0x000fc0, 0x00003f, 0xfc0000)
+        elseif bpp == 32 then
+            self:set_pixel_format(bpp, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000)
+        end
     else
         self:set_linear(computeImageSize(width, height, depth, bpp, fmt))
         if     fmt == Format_DXT1 or fmt == Format_DXT1a then
@@ -334,18 +341,18 @@ function DDSHeader:generate(width, height, mips, fmt, bpp, cubemap, depth, norma
             if normal then self:set_normal_flag(true) end
         end
     end
-    
+
     -- TODO: swapBytes()
-    
+
     local header_size = 128 // 4
     if self:hasDX10Header() then
         header_size = 128 + 20 // 4
     end
-    
+
     local data = {}
     for i = 1, header_size do
-        table.insert(data, string.pack("<L", self[i]))
+        table.insert(data, string.pack("<I", self[i]))
     end
     return table.concat(data)
-    
+
 end
