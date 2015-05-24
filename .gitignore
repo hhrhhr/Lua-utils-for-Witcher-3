@@ -17,3 +17,6 @@ $RECYCLE.BIN/
 *.exe
 *.dll
 *.csv
+
+# temp
+tmp/*
