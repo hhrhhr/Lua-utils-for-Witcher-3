@@ -5,6 +5,7 @@ require("mod_binary_reader")
 
 local in_file = assert(arg[1], "ERR: no input file")
 local out_path = arg[2] or "."
+local RW = arg[3] or false
 
 local r = BinaryReader
 r:open(in_file)
@@ -26,6 +27,7 @@ local files = {}
 for i = 1, file_num do
     local t = {}
     local pos = r:pos()
+    
     t.name = r:str()
     r:seek(pos + 256)
 
@@ -40,9 +42,14 @@ for i = 1, file_num do
     local unk6 = r:uint32()
     t.pack = r:uint32()     -- 0 - not packed, 1 - zlib, 5 - LZ??
 
-    --print(i, t.size, t.zsize, t.offs, t.pack, t.name)
+    if not RW then
+        print(i, t.size, t.zsize, t.offs, t.pack, t.name)
+    end
+    
     table.insert(files, t)
 end
+
+if not RW then os.exit() end
 
 
 -- process dir tree
@@ -57,6 +64,9 @@ for i = 1, file_num do
     table.insert(dirs_tmp, table.concat(t, "\\"))
 end
 table.sort(dirs_tmp)
+
+
+-- uniq
 
 local dirs = {}
 tmp = ""
@@ -74,7 +84,6 @@ end
 for k, v in ipairs(dirs) do
     --print(v)
     local cmd = "mkdir \"" .. out_path .. "\\" .. v .. "\" >nul 2>&1"
-    --print(cmd)
     os.execute(cmd)
 end
 
@@ -91,12 +100,13 @@ for i = 1, file_num do
     elseif f.pack == 1 then
         local stream = zlib.inflate()
         data, eof, bytes_in, bytes_out = stream(data)
+        assert(true == eof)
         assert(f.zsize == bytes_in)
         assert(f.size == bytes_out)
-    elseif f.pack == 5 then
+    elseif f.pack == 4 or f.pack == 5 then
         print("LZ?? chunk, copy as is: " .. f.name)
     else
-        print("unknown chunk, copy as is" .. f.name)
+        print("unknown chunk, copy as is: " .. f.name)
     end
     w:write(data)
     w:close()
