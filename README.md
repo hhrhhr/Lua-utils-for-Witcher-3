@@ -9,9 +9,9 @@
 
 #### inspect_w3strings.lua
 ````
-lua inspect_w3strings.lua path_to.w3.strings [output_dir]
+lua inspect_w3strings.lua path_to.w3.strings [output_dir [debug]]
 ````
-попытка разбора локализации. результат записывается в файл ````strings_utf16le.txt````. локализации *ar|br|esMX* не зашифрованы, что может помочь в дальнейшем анализе.
+попытка разбора локализации. результат записывается в файл ````strings_utf16le.txt```` в каталоге ````output_dir```` либо в текущем. указание опции ````debug```` включает вывод второго блока данных с непонятным (пока что) предназначением.
 
 #### inspect_textures.lua
 ````

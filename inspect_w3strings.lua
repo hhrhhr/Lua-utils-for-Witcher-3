@@ -1,51 +1,17 @@
 require("mod_binary_reader")
+require("mod_w3strings")
 
 local in_file = assert(arg[1], "no input")
 local out_path = arg[2] or "."
+local debug = arg[3] or false
 
 local r = BinaryReader
 r:open(in_file)
-
---[[
-char magic[4];      // "RTSW"
-int version;        // 162??
-unsigned char x1;   // x1, x2 and x3, x4 the same in all files of 
-unsigned char x2;   // selected localization
-
-uint6 count1;       // count of string
-{
-    int file_id;    // unique within the file
-    int offset;     // relative to start of utf[], must be multiple by 2
-    int str_len;    // -= 1 * 2, skip ending zeroes
-} * num
-
-uint6 count2;       
-{
-    char unk[4]     // global id? or to change the order of rows?
-    int file_id     // same with first block
-} * count2
-
-uint6 count3;       // count of UTF16 chars (2 byte)
-{
-    utf[count3 * 2] // \x00\x00 ended UTF16LE strings
-}
-
-unsigned char x3;
-unsigned char x4;
-]]
-
-r:idstring("RTSW")
-r:idstring("\xA2\x00\x00\x00")  -- 162
-
-local xor1 = r:uint8()
-local xor2 = r:uint8()
-
 
 local function bit6()
     local result, shift, b = 0, 0, 0
     repeat
         b = r:uint8()
-        -- FIX
         if b == 128 then return 0 end
         local s = 6
         local mask = 255
@@ -61,83 +27,129 @@ local function bit6()
     return result
 end
 
+local function toutf16le(str)
+    local s = string.gsub(str, "(.)", "%1\x00")
+    return s
+end
+
 --[[
-local b1 = bit6(); io.write(b1 .. "*12\t-> ")
-r:jmp("cur", b1 * 12)
-print(r:pos())
+char magic[4];      // "RTSW"
+int version;        // 162
+unsigned short key1;
 
-local b2 = bit6(); io.write(b2 .. "*8\t-> ")
-r:jmp("cur", b2 * 8)
-print(r:pos())
+uint6 count1;       // count of string
+{
+    int str_id;    // ^key, unique
+    int offset;     // relative to start of utf[], must be multiple by 2
+    int strlen;     // * 2, skip ending zeroes
+} // * num
 
-local b3 = bit6(); io.write(b3 .. "*2\t-> ")
-r:jmp("cur", b3 * 2)
-print(r:pos())
+uint6 count2;       
+{
+    char unk[4]     // global id? crc? hash?
+    int str_id     // ^key, same with first block
+} // * count2
 
-local xor3 = r:uint8()
-local xor4 = r:uint8()
+uint6 count3;       // count of UTF16 chars (2 byte)
+{
+    utf[count3 * 2] // \x00\x00 ended UTF16LE strings
+}
 
-print(xor1, xor2, xor3, xor4)
+unsigned short key2;    // key = key1 << 16 | key2
+]]
 
-os.exit()
---]]
+r:idstring("RTSW")
+r:idstring("\xA2\x00\x00\x00")  -- 162
+
+
+local key1 = r:uint16()
+r:seek(r:size() - 2)
+local magic = r:uint16()
+magic = key1 << 16 | magic
+io.write(string.format("magic: 0x%08X ", magic))
+magic = get_key(magic)
+io.write(string.format("-> 0x%08X\n", magic))
+r:seek(10)
 
 
 local count1 = bit6()
-print(count1, count1 * 12)
+print("block 1, count = " .. count1, count1 * 12 .. " bytes")
 
 local t1 = {}
 for i = 1, count1 do
-    local sid = r:uint32()
-    local off = r:uint32()
-    local len = r:uint32()
-    table.insert(t1, {sid = sid, off = off, len = len})
-    print(i, sid, off, len)
+    local str_id = r:uint32() ~ magic
+    local offset = r:uint32()
+    local strlen = r:uint32()
+    table.insert(t1, {str_id = str_id, offset = offset, strlen = strlen})
 end
-print()
 
 
 local count2 = bit6()
-print(count2, count2 * 8)
+print("block 2, count = " .. count2, count2 * 8 .. " bytes")
 
 local t2 = {}
 for i = 1, count2 do
     local unk1 = r:uint32()
-    local sid = r:uint32()
-    table.insert(t2, {unk1 = unk1, sid = sid})
-    print(i, unk1, sid)
+    local str_id = r:uint32() ~ magic
+    table.insert(t2, {unk1 = unk1, str_id = str_id})
 end
-print()
 
 
 local count3 = bit6()
-print(count3, count3 * 2)
+print("block 3, count = " .. count3, count3 * 2 .. " bytes")
 
+local str_start = r:pos()
+
+--------------------------------------------------------------------
+if debug then
+    --[[
+    print("-- block 1 content ----------------")
+    for i = 1, count1 do
+        local t = t1[i]
+        print(string.format("%d:\t0x%08X\t%d\t%d", i, t.str_id, t.offset, t.strlen))
+    end
+    --]]
+    print("-- block 2 content ----------------")
+    for i = 1, count2 do
+        local t = t2[i]
+        print(string.format("%d:\t0x%08X\t0x%08x", i, t.unk1, t.str_id))
+    end
+    print("-----------------------------------")
+end
+--------------------------------------------------------------------
+print("sorting...")
+table.sort(t1, function(a, b) return a.str_id < b.str_id end)
+print("sorted.")
+--------------------------------------------------------------------
 local w = assert(io.open(out_path .. "\\" .. "strings_utf16le.txt", "w+b"))
 w:write("\xFF\xFE")     -- UTF-16LE
 
-local start = r:pos()
 for i = 1, count1 do
-    r:seek(t1[i].off * 2 + start)
-    for j = 1, t1[i].len, 2 do
+    local offset = t1[i].offset * 2 + str_start
+    r:seek(offset)
+    
+    local strlen = t1[i].strlen
+    local string_key = magic >> 8 & 0xffff  -- (unsigned short)
+    
+    w:write(toutf16le(string.format("0x%08x ## ", t1[i].str_id)))
+    for j = 1, strlen do
         local b1 = (r:uint8())
         local b2 = (r:uint8())
-        -- TODO:
-        --b1 = decode(b1)
-        --b2 = decode(b2)
-        w:write(string.char(b1))
-        w:write(string.char(b2))
+        -- decode
+        local char_key = ((strlen + 1) * string_key) & 0xffff        
+        b1 = b1 ~ ((char_key >> 0) & 0xff)
+        b2 = b2 ~ ((char_key >> 8) & 0xff)
+        -- rotate left
+        string_key = (string_key << 1 ) | (string_key >> 15)
+        string_key = string_key & 0xffff
+        
+        w:write(string.char(b1, b2))
     end
-    w:write("\n\0")
+    w:write("\n\0") -- unix like
 end
-print()
+print("done!")
 
 w:close()
-
-r:seek(count3 * 2 + start)
-local xor3 = r:uint8()
-local xor4 = r:uint8()
-print("keys??", xor1, xor2, xor3, xor4)
 
 -- EOF
 r:close()
