@@ -39,15 +39,15 @@ unsigned short key1;
 
 uint6 count1;       // count of string
 {
-    int str_id;    // ^key, unique
+    int str_id;     // ^key, unique
     int offset;     // relative to start of utf[], must be multiple by 2
-    int strlen;     // * 2, skip ending zeroes
-} // * num
+    int strlen;     // number of UTF16 chars, without ending zeroes
+} // * count1
 
 uint6 count2;       
 {
     char unk[4]     // global id? crc? hash?
-    int str_id     // ^key, same with first block
+    int str_id      // ^key, same with first block
 } // * count2
 
 uint6 count3;       // count of UTF16 chars (2 byte)
