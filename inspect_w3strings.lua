@@ -9,7 +9,7 @@ local r = BinaryReader
 r:open(in_file)
 
 local function bit6()
-    local result, shift, b = 0, 0, 0
+    local result, shift, b, i = 0, 0, 0, 1
     repeat
         b = r:uint8()
         if b == 128 then return 0 end
@@ -23,7 +23,8 @@ local function bit6()
         end
         result = result | ((b & mask) << shift)
         shift = shift + s
-    until b < 64
+        i = i + 1
+    until b < 64 or i == 3
     return result
 end
 
@@ -119,7 +120,7 @@ end
 --------------------------------------------------------------------
 print("sorting...")
 table.sort(t1, function(a, b) return a.str_id < b.str_id end)
-print("sorted.")
+print("sorted")
 --------------------------------------------------------------------
 local w = assert(io.open(out_path .. "\\" .. "strings_utf16le.txt", "w+b"))
 w:write("\xFF\xFE")     -- UTF-16LE
@@ -147,9 +148,13 @@ for i = 1, count1 do
     end
     w:write("\n\0") -- unix like
 end
-print("done!")
-
 w:close()
+print("done")
 
--- EOF
+r:seek(count3 * 2 + str_start)
+local left = r:size() - r:pos() - 2
+if left > 0 then
+    print("!!! remains " .. left .. " bytes of unknown data !!!")
+end
+
 r:close()
