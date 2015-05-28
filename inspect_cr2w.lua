@@ -33,7 +33,7 @@ for i = 1, 10 do
     local offs = r:uint32()
     local size = r:uint32()
     local crc = r:hex32(1)
-    io.write(string.format("%2d: %5d %4d %s\n", i, offs, size, crc))
+    --io.write(string.format("%2d: %5d %4d %s\n", i, offs, size, crc))
     table.insert(h, {offs, size, crc})
 end
 print()
@@ -46,7 +46,7 @@ local i = 0
 while r:pos() < h[1][1] + h[1][2] do
     local str = r:str()
     table.insert(t, str)
-    print("", i, str)
+    --print("", i, str)
     i = i + 1
 end
 table.insert(data, t)
@@ -62,7 +62,7 @@ for i = 2, 10 do
             local v = r:uint32()
             table.insert(tt, v)
         end
-        print("", table.concat(tt, ", "))
+        --print("", table.concat(tt, ", "))
         table.insert(t, tt)
     end
     table.insert(data, t)
@@ -75,7 +75,6 @@ local function bit6()
     local result, shift, b = 0, 0, 0
     repeat
         b = r:uint8()
-        -- FIX
         if b == 128 then return 0 end
         local s = 6
         local mask = 255
@@ -94,6 +93,7 @@ end
 
 local Float
 local Uint8
+local Uint16
 local Uint32
 local Int32
 local String
@@ -101,7 +101,7 @@ local String
 local CName
 local Vector
 local TagList
-local SEntityMapPinInfo
+local Array
 local CEntityTemplate
 local IMaterial
 
@@ -142,12 +142,15 @@ local function get()
 
     local val
     if     typ == "Float" then val = Float()
-    elseif typ == "Uint32" then val = Uint32()
     elseif typ == "Uint8" then val = Uint8()
-    elseif typ == "Bool" then val = Uint8()
+    elseif typ == "Uint16" then val = Uint16()
+    elseif typ == "Uint32" then val = Uint32()
     elseif typ == "Int32" then val = Int32()
+    elseif typ == "Bool" then val = Uint8()
+
     elseif typ == "String" then val = String(size)
     elseif typ == "CName" then val = CName(size)
+    
     elseif typ == "ETextureCompression" then val = CName(size)
     elseif typ == "EMeshVertexType" then val = CName(size)
     elseif typ == "DeferredDataBuffer" then val = CName(size)
@@ -158,15 +161,58 @@ local function get()
     elseif typ == "SMeshCookedData" then val = Vector(size)
 
     elseif typ == "TagList" then val = TagList(size)
-    elseif typ == "array:2,0,SEntityMapPinInfo" then val = SEntityMapPinInfo(size)
-    elseif typ == "array:2,0,SAreaMapPinInfo" then val = SEntityMapPinInfo(size)
+    elseif typ == "array:2,0,SEntityMapPinInfo" then val = Array(size)
+    elseif typ == "array:2,0,SAreaMapPinInfo" then val = Array(size)
     elseif typ == "array:2,0,handle:CEntityTemplate" then val = CEntityTemplate(size)
     elseif typ == "array:2,0,handle:IMaterial" then val = dumb1(size)
     elseif typ == "handle:IMaterial" then val = dumb3(size)
-    elseif typ == "array:2,0,SMeshChunkPacked" then val = SEntityMapPinInfo(size)
-    elseif typ == "array:46,0,Vector" then val = SEntityMapPinInfo(size)
+    elseif typ == "array:2,0,SMeshChunkPacked" then val = Array(size)
+    elseif typ == "array:46,0,Vector" then val = Array(size)
     elseif typ == "array:46,0,Float" then val = dumb1(size)
     elseif typ == "array:46,0,Uint8" then val = dumb2(size)
+
+    elseif typ == "array:2,0,ptr:IGameplayDLCMounter" then val = dumb4(size)
+        --elseif typ == "array:2,0,ptr:CBehaviorGraphPoseSlotNode" then val = dumb4(size)
+
+    elseif typ == "ptr:CClipMap" then val = dumb4(size)
+    elseif typ == "handle:C2dArray" then val = dumb4(size)
+    elseif typ == "handle:CUmbraScene" then val = dumb4(size)
+    elseif typ == "ptr:CPathLibWorld" then val = dumb4(size)
+    elseif typ == "CWorldShadowConfig" then val = Vector(size)
+    elseif typ == "SWorldEnvironmentParameters" then val = Vector(size)
+    elseif typ == "handle:CBitmapTexture" then val = dumb4(size)
+    elseif typ == "handle:CMesh" then val = dumb4(size)
+    elseif typ == "handle:CMaterialInstance" then val = dumb4(size)
+    elseif typ == "ptr:CFoliageScene" then val = dumb4(size)
+    elseif typ == "ptr:CMergedWorldGeometry" then val = dumb4(size)
+    elseif typ == "handle:CCookedExplorations" then val = dumb4(size)
+    elseif typ == "handle:CWayPointsCollectionsSet" then val = dumb4(size)
+--    elseif typ == "handle:C2dArray" then val = dumb4(size)
+--    elseif typ == "handle:C2dArray" then val = dumb4(size)
+--    elseif typ == "handle:C2dArray" then val = dumb4(size)
+--    elseif typ == "handle:C2dArray" then val = dumb4(size)
+--    elseif typ == "handle:C2dArray" then val = dumb4(size)
+--    elseif typ == "handle:C2dArray" then val = dumb4(size)
+    elseif typ == "handle:C2dArray" then val = dumb4(size)
+    elseif typ == "CGlobalLightingTrajectory" then val = Vector(size)
+    elseif typ == "SSimpleCurve" then val = Vector(size)
+    elseif typ == "array:142,0,SCurveDataEntry" then val = Array(size)
+    elseif typ == "handle:CEnvironmentDefinition" then val = dumb4(size)
+    elseif typ == "SGlobalSpeedTreeParameters" then val = Vector(size)
+    elseif typ == "SWorldSkyboxParameters" then val = Vector(size)
+    elseif typ == "SWorldRenderSettings" then val = Vector(size)
+--    elseif typ == "CWorldShadowConfig" then val = Vector(size)
+--    elseif typ == "CWorldShadowConfig" then val = Vector(size)
+--    elseif typ == "CWorldShadowConfig" then val = Vector(size)
+--    elseif typ == "CWorldShadowConfig" then val = Vector(size)
+--    elseif typ == "CWorldShadowConfig" then val = Vector(size)
+
+    elseif typ == "array:2,0,CName" then val = dumb5(size)
+--    elseif typ == "array:142,0,SCurveDataEntry" then val = SEntityMapPinInfo(size)
+--    elseif typ == "array:142,0,SCurveDataEntry" then val = SEntityMapPinInfo(size)
+--    elseif typ == "array:142,0,SCurveDataEntry" then val = SEntityMapPinInfo(size)
+--    elseif typ == "array:142,0,SCurveDataEntry" then val = SEntityMapPinInfo(size)
+
     else
         assert(false, "!!!" .. typ .. "!!!")
     end
@@ -240,7 +286,7 @@ function TagList(size)
     io.write("}")
 end
 
-function SEntityMapPinInfo(size)
+function Array(size)
     local stop = r:pos() + size
     local arr = r:uint32()
     print("{ // arr=" .. arr .. ", size=" .. size)
@@ -271,25 +317,46 @@ function dumb2(size)
 end
 
 function dumb3(size)
-    Uint32()
+    Int32()
     io.write(", ")
     Uint16()
     io.write(", ")
-    Uint32()
+    Int32()
     io.write(", ")
+    Int32()
+end
+
+function dumb4(size)
+    local stop = r:pos() + size
+    while r:pos() < stop do
+        Int32()
+        io.write(", ")
+    end
+end
+
+function dumb5(size)
+    local stop = r:pos() + size
     Uint32()
+    io.write("\n")
+    l = l + 1
+    while r:pos() < stop do
+        tab(l)
+        CName()
+        io.write("\n")
+    end
+    l = l - 1
 end
 
 --local stop = r:pos() + data[5][1][4]
 
 local chunks = #data[5]
 
---for i = 1, chunks do
---    r:seek(data[5][i][4])
---    print("\n\n-----------------------------------------------------------")
+for i = 1, chunks do
+    r:seek(data[5][i][4])
+    print("\n\n-----------------------------------------------------------")
     r:uint8()   -- \x00
     while get() do end
---end
+end
 
 
 print()
