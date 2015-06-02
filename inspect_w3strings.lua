@@ -2,7 +2,7 @@ require("mod_binary_reader")
 require("mod_w3strings")
 
 local in_file = assert(arg[1], "no input")
-local out_path = arg[2] or "."
+local out_file = arg[2] or ".\\strings_utf16le.txt"
 local debug = arg[3] or false
 
 local r = BinaryReader
@@ -24,7 +24,7 @@ local function bit6()
         result = result | ((b & mask) << shift)
         shift = shift + s
         i = i + 1
-    until b < 64 or i == 3
+    until (b < 64) or (i == 3 and b < 128)
     return result
 end
 
@@ -122,7 +122,7 @@ print("sorting...")
 table.sort(t1, function(a, b) return a.str_id < b.str_id end)
 print("sorted")
 --------------------------------------------------------------------
-local w = assert(io.open(out_path .. "\\" .. "strings_utf16le.txt", "w+b"))
+local w = assert(io.open(out_file, "w+b"))
 w:write("\xFF\xFE")     -- UTF-16LE
 
 for i = 1, count1 do
