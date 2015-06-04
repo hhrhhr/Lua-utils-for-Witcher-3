@@ -11,7 +11,8 @@ local r = BinaryReader
 r:open(in_file)
 
 r:idstring("POTATO70")
-assert(r:size() == r:uint32())
+--assert(r:size() == r:uint32())
+r:uint32()
 
 local size = r:uint32()
 local header_sz = r:uint32()
