@@ -346,7 +346,7 @@ function DDSHeader:generate(width, height, mips, fmt, bpp, cubemap, depth, norma
 
     local header_size = 128 // 4
     if self:hasDX10Header() then
-        header_size = 128 + 20 // 4
+        header_size = (128 + 20) // 4
     end
 
     local data = {}
