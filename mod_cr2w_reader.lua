@@ -110,7 +110,7 @@ local function read_type_val(var, separator)
     if DBG > 0 then
         io.write("type = " .. typ .. ", size = " .. size .. "\n")
     end
-    
+
     tab()
     io.write(var .. " = ")
 
@@ -118,11 +118,35 @@ local function read_type_val(var, separator)
         for d1, d2, t2 in string.gmatch(typ, "array:(%d+),(%d+),(.+)") do
             CR2W.Array(size, d1, d2, t2)
         end
+    elseif string.sub(typ, 1, 4) == "ptr:" then
+        for t2 in string.gmatch(typ, "ptr:(.+)") do
+            CR2W.ptr(t2)
+        end
+    elseif string.sub(typ, 1, 7) == "handle:" then
+        for t2 in string.gmatch(typ, "handle:(.+)") do
+            CR2W.handle(t2)
+        end
+
     else
         if not (pcall(CR2W[typ], size)) then
             io.write("nil" .. (separator or ""))
-            io.write("\t-- !!! skip " .. size .." bytes !!!")
+            io.write("\t-- !!! skip " .. size .." bytes ")
+            
+            if DBG == 0 then
+                io.write("(" .. typ .. ") ")
+            end
+
             local pos = r:pos()
+            local sz = size
+            if sz > 12 then sz = 12 end
+            for i = 1, sz do
+                local b = r:uint8()
+                io.write(string.format("%02X", b))
+            end
+            if size > 12 then
+                io.write("...")
+            end
+
             io.stderr:write("ERR: unknown type '" .. typ .. "' at offset " .. pos .. "\n")
             -- skip this data
             local jmp = pos + size
@@ -139,7 +163,7 @@ local function read_var(separator)
         tab()
         io.write("-- " .. r:pos() .. ": ")
     end
-    
+
     local var = r:uint16()
     if var == 0 then 
         if DBG > 0 then
@@ -153,6 +177,12 @@ end
 
 
 -------------------------------------------------------------------------------
+
+function CR2W.Bool()
+    local val = r:uint8()
+    val = val == 0 and "false" or "true"
+    io.write(val)
+end
 
 
 function CR2W.Int8()
@@ -224,8 +254,26 @@ function CR2W.Vector(size)
     io.write("}")
 end
 
-function CR2W.EulerAngles(size)
-    CR2W.Vector(size)
+function CR2W.EulerAngles(size)                 CR2W.Vector(size) end
+function CR2W.CWorldShadowConfig(size)          CR2W.Vector(size) end
+function CR2W.SWorldEnvironmentParameters(size) CR2W.Vector(size) end
+function CR2W.CGlobalLightingTrajectory(size)   CR2W.Vector(size) end
+function CR2W.SSimpleCurve(size)                CR2W.Vector(size) end
+function CR2W.SGlobalSpeedTreeParameters(size)  CR2W.Vector(size) end
+function CR2W.SWorldSkyboxParameters(size)      CR2W.Vector(size) end
+function CR2W.SWorldRenderSettings(size)        CR2W.Vector(size) end
+function CR2W.CGenericGrassMask(size) CR2W.Vector(size) end
+--function CR2W.(size) CR2W.Vector(size) end
+
+
+function CR2W.ptr(t2)
+    CR2W.Uint32()
+    io.write("\t--[[*" .. t2 .. "]]")
+end
+
+function CR2W.handle(t2)
+    CR2W.Int32()
+    io.write("\t--[[handle " .. t2 .. "]]")
 end
 
 function CR2W.TagList(size)
@@ -251,16 +299,22 @@ function CR2W.Array(size, d1, d2, t2)
     io.write("{ -- " .. count .. " element[s] of '" .. t2 .. "'\n")
     l = l + 1
     for i = 1, count do
-        assert(0 == r:uint8())
         tab()
-        io.write("[" .. i .. "] = {\n")
-        l = l + 1
-        while read_var(",") do end
-        l = l - 1
-        tab()
-        io.write("},\n")
+        if t2 == "CName" then
+            CR2W.CName(size)
+            io.write(",\n")
+        else
+            assert(0 == r:uint8())
+            io.write("[" .. i .. "] = {\n")
+            l = l + 1
+            while read_var(",") do end
+            l = l - 1
+            tab()
+            io.write("},\n")
+        end
     end
     l = l - 1
+    tab()
     io.write("}")
 end
 
