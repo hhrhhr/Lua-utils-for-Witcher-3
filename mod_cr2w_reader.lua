@@ -80,6 +80,9 @@ function CR2W.read_header()
 end
 
 
+-------------------------------------------------------------------------------
+
+
 local function read_type_val(var, separator)
     local typ = r:uint16()
     local size = r:uint32() - 4
@@ -97,19 +100,16 @@ local function read_type_val(var, separator)
     else
         if not (pcall(CR2W[typ], size)) then
             io.write("nil")
-            if separator then
-                io.write(separator)
-            end
+            io.write(separator or "")
             io.write("\t-- !!! skip " .. size .." bytes !!!")
-            local jmp = r:pos() + size
+            local pos = r:pos()
+            io.stderr:write("ERR: unknown type '" .. typ .. "' at offset " .. pos - 8 .. "\n")
+            local jmp = pos() + size
             r:seek(jmp)
         end
     end
     
-    if separator then
-        io.write(separator)
-    end
-    
+    io.write(separator or "")
     io.write("\n")
 end
 
@@ -131,6 +131,11 @@ end
 
 function CR2W.Int32()
     local val = r:sint32()
+    io.write(val)
+end
+
+function CR2W.Uint32()
+    local val = r:uint32()
     io.write(val)
 end
 
@@ -172,12 +177,30 @@ function CR2W.Vector(size)
     io.write("}")
 end
 
+function CR2W.EulerAngles(size)
+    CR2W.Vector(size)
+end
+
+
+function CR2W.TagList(size)
+    local count = r:uint8()
+    io.write("{\n")
+    CR2W.CName(size)
+    for i = 2, count do
+        io.write(", ")
+        CR2W.CName(size)
+    end
+    io.write("\n}")
+end
+
 
 function CR2W.Array(size, d1, d2, t2)
     io.write("{\n")
     
     local stop = r:pos() + size
     local count = r:uint32()
+    
+    io.write("-- " .. count .. " elements\n")
     
     for i = 1, count do
         assert(0 == r:uint8())
@@ -188,7 +211,7 @@ function CR2W.Array(size, d1, d2, t2)
         io.write("},\n")
     end
     
-    io.write("}\n")
+    io.write("}")
 end
 
 
@@ -198,7 +221,7 @@ end
 function CR2W.start_parse()
     local chunks = #header[5]
     for i = 1, chunks do
-        print("\n--[[ chunk " .. i .. " ]]")
+        print("\n--[[ chunk " .. i .. " ]]\n")
         r:seek(header[5][i][4])
         r:uint8()   -- \x00
         while read_var() do end
