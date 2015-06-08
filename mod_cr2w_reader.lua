@@ -1,0 +1,211 @@
+assert(_VERSION == "Lua 5.3")
+
+CR2W = {
+    --Int32 = 0
+}
+
+local r = 0         -- file handle
+local header = {}   -- header data
+
+
+function CR2W.init(file_handle, offset)
+    r = file_handle
+    r:seek(offset or 0)
+end
+
+
+function CR2W.read_header()
+    r:idstring("CR2W")
+
+    print("--[[")
+
+    io.write("header: ")
+    for i = 1, 3 do
+        io.write(r:hex32())
+        io.write(" ")
+    end
+    io.write("\n\n")
+
+-- 0x0010
+    print("id??", r:hex32() .. " " .. r:hex32())
+    print("size", r:uint32() .. "\\" .. r:uint32())
+-- 0x0020
+    print("unk1", r:hex32())
+    print("unk2", r:uint32() .. "")
+
+-- modifiers for 'size': 1-1, 2-8, 3-8, 4-16, 5-24, 6-24
+    local h = {}
+    io.write("\n id   off size      crc\n")
+    for i = 1, 10 do
+        local offs = r:uint32()
+        local size = r:uint32()
+        local crc = r:hex32(1)
+        io.write(string.format("%2d: %5d %4d %s\n", i, offs, size, crc))
+        table.insert(h, {offs, size, crc})
+    end
+    print()
+
+    header = {}
+
+    --print(r:pos() .. ":", "block 1 start")
+    local t = {}
+    local i = 0
+    while r:pos() < h[1][1] + h[1][2] do
+        local str = r:str()
+        table.insert(t, str)
+        --print("", i, str)
+        i = i + 1
+    end
+    table.insert(header, t)
+    print()
+
+                --  1  2  3  4  5  6  7  8  9  10
+    local b_size = {1, 2, 2, 4, 6, 6, 0, 0, 0, 0}
+    for i = 2, 10 do
+        --print(r:pos() .. ":", "block " .. i .. " start")
+        local t = {}
+        for j = 1, h[i][2] do
+            local tt = {}
+            for k = 1, b_size[i] do
+                local v = r:uint32()
+                table.insert(tt, v)
+            end
+            --print("", table.concat(tt, ", "))
+            table.insert(t, tt)
+        end
+        table.insert(header, t)
+        --print()
+    end
+    print("--]]")
+end
+
+
+local function read_type_val(var, separator)
+    local typ = r:uint16()
+    local size = r:uint32() - 4
+    
+    typ = header[1][typ+1]
+    var = header[1][var+1]
+    
+    io.write("type = " .. typ .. ", size = " .. size .. "\n")
+    io.write(var .. " = ")
+    
+    if string.sub(typ, 1, 6) == "array:" then
+        for d1, d2, t2 in string.gmatch(typ, "array:(%d+),(%d+),(.+)") do
+            CR2W.Array(size, d1, d2, t2)
+        end
+    else
+        if not (pcall(CR2W[typ], size)) then
+            io.write("nil")
+            if separator then
+                io.write(separator)
+            end
+            io.write("\t-- !!! skip " .. size .." bytes !!!")
+            local jmp = r:pos() + size
+            r:seek(jmp)
+        end
+    end
+    
+    if separator then
+        io.write(separator)
+    end
+    
+    io.write("\n")
+end
+
+
+local function read_var(separator)
+    io.write("-- " .. r:pos() .. ": ")
+    local var = r:uint16()
+    if var == 0 then 
+        io.write("EOB\n")
+        return false
+    end
+    read_type_val(var, separator)
+    return true
+end
+
+
+-------------------------------------------------------------------------------
+
+
+function CR2W.Int32()
+    local val = r:sint32()
+    io.write(val)
+end
+
+function CR2W.Float()
+    local val = r:float()
+    io.write(val)
+end
+
+function CR2W.String(size)
+    local len = r:uint8()
+
+    assert(len >= 128)
+    len = len - 128
+    if len >= 64 then
+        len = len - 64
+        len = r:uint8() * 64 + len
+    end
+
+    local val = r:str(len)
+    io.write("\"" .. val .. "\"")
+end
+
+function CR2W.CName(size)
+    local val = r:uint16()
+    val = header[1][val+1]
+    io.write("\"" .. val .. "\"")
+end
+
+
+function CR2W.Vector(size)
+    io.write("{\n")
+    
+    local stop = r:pos() + size
+    assert(0 == r:uint8())
+    
+    while r:pos() < stop do
+        read_var(",")
+    end
+    io.write("}")
+end
+
+
+function CR2W.Array(size, d1, d2, t2)
+    io.write("{\n")
+    
+    local stop = r:pos() + size
+    local count = r:uint32()
+    
+    for i = 1, count do
+        assert(0 == r:uint8())
+        io.write("[" .. i .. "] = {\n")
+        
+        while read_var(",") do end
+        
+        io.write("},\n")
+    end
+    
+    io.write("}\n")
+end
+
+
+-------------------------------------------------------------------------------
+
+
+function CR2W.start_parse()
+    local chunks = #header[5]
+    for i = 1, chunks do
+        print("\n--[[ chunk " .. i .. " ]]")
+        r:seek(header[5][i][4])
+        r:uint8()   -- \x00
+        while read_var() do end
+    end
+end
+
+--for k, v in pairs(_G) do
+--    print(k, v)
+--end
+
