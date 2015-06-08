@@ -51,17 +51,21 @@ function CR2W.read_header()
     end
 
     header = {}
-
+    
     if DBG > 0 then
         print("\n" .. r:pos() .. ":", "block 1 start")
     end
     local t = {}
     local i = 0
+    local h2 = h[2][2]
+    
     while r:pos() < h[1][1] + h[1][2] do
         local str = r:str()
         table.insert(t, str)
         if DBG > 1 then
-            print("", i, str)
+            local ii = i
+            if i >= h2 then ii = i - h2 end
+            print("", ii, str)
         end
         i = i + 1
     end
@@ -99,6 +103,24 @@ local function tab()
     io.write(string.rep("    ", l))
 end
 
+local function func(typ)
+    for t1, t2 in string.gmatch(typ, "(%a+):(.+)") do
+        if t1 == "array" then
+            io.write("array {\n")
+            for d1, d2, t3 in string.gmatch(t2, "(%d+),(%d+),(.+)") do
+                func(t3)
+            end
+            io.write("}")
+        elseif t1 == "ptr" then
+            io.write(t2)
+        elseif t1 == "handle" then
+            io.write(t2)
+        end
+        io.write("\n")
+        return
+    end
+    print(typ)
+end
 
 local function read_type_val(var, separator)
     local typ = r:uint16()
@@ -113,6 +135,8 @@ local function read_type_val(var, separator)
 
     tab()
     io.write(var .. " = ")
+    
+    
 
     if string.sub(typ, 1, 6) == "array:" then
         for d1, d2, t2 in string.gmatch(typ, "array:(%d+),(%d+),(.+)") do
@@ -141,7 +165,7 @@ local function read_type_val(var, separator)
             if sz > 12 then sz = 12 end
             for i = 1, sz do
                 local b = r:uint8()
-                io.write(string.format("%02X", b))
+                io.write(string.format("%02X ", b))
             end
             if size > 12 then
                 io.write("...")
@@ -262,18 +286,23 @@ function CR2W.SSimpleCurve(size)                CR2W.Vector(size) end
 function CR2W.SGlobalSpeedTreeParameters(size)  CR2W.Vector(size) end
 function CR2W.SWorldSkyboxParameters(size)      CR2W.Vector(size) end
 function CR2W.SWorldRenderSettings(size)        CR2W.Vector(size) end
-function CR2W.CGenericGrassMask(size) CR2W.Vector(size) end
+function CR2W.CGenericGrassMask(size)           CR2W.Vector(size) end
 --function CR2W.(size) CR2W.Vector(size) end
 
 
 function CR2W.ptr(t2)
-    CR2W.Uint32()
-    io.write("\t--[[*" .. t2 .. "]]")
+    local val = r:sint32()
+    io.write(val .. "\t-- ptr to chunk_" .. val)
 end
 
 function CR2W.handle(t2)
-    CR2W.Int32()
-    io.write("\t--[[handle " .. t2 .. "]]")
+    local val = r:sint32()
+    if val < 0 then
+        local idx = val - #header[2]
+        io.write("\"" .. header[1][-idx] .. "\"")
+    else
+        io.write(val .. "\t-- handle of chunk_" .. val)
+    end
 end
 
 function CR2W.TagList(size)
@@ -325,8 +354,8 @@ end
 function CR2W.start_parse()
     local chunks = #header[5]
     for i = 1, chunks do
-        print("\n--[[ chunk " .. i .. " ]]\n")
         r:seek(header[5][i][4])
+        print("\n-- " .. r:pos() .. ": [[ chunk_" .. i .. " ]]\n")
         r:uint8()   -- \x00
         while read_var() do end
     end
