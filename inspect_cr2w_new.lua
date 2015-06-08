@@ -8,11 +8,8 @@ local r = BinaryReader
 r:open(in_file)
 
 local c = CR2W
-c.init(r)
-
+c.init(r, 0, 0) -- file, offset, debug level
 c.read_header()
-
 c.start_parse()
-
 
 r:close()
