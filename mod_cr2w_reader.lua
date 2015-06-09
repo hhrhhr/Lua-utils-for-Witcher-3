@@ -5,7 +5,7 @@ CR2W = {}
 local r = 0         -- file handle
 local header = {}   -- header data
 local DBG = 0       -- 0, 1, 2
-local l = 0         -- tab level
+local l = 1         -- tab level
 
 function CR2W.init(file_handle, offset, debug)
     r = file_handle
@@ -13,6 +13,30 @@ function CR2W.init(file_handle, offset, debug)
     DBG = debug or 0
 end
 
+--[[
+block_1 - zero ended strings
+
+block_2 - {
+            start offset in block1 (strings),
+            32-bit FNV_1a hash of string (with \x00)
+}
+
+block_3 - {
+            start offset in block1 (name of handles???),
+            filetype (69 - .xbm, 90 - .env, 41 - .csv, ...)
+}
+
+block_4 - {???}
+
+block_5 - {
+            ????,
+            ????,
+            size,
+            offset,
+            ????,
+            CRC32
+}
+--]]
 
 function CR2W.read_header()
     r:idstring("CR2W")
@@ -51,14 +75,14 @@ function CR2W.read_header()
     end
 
     header = {}
-    
+
     if DBG > 0 then
         print("\n" .. r:pos() .. ":", "block 1 start")
     end
     local t = {}
     local i = 0
     local h2 = h[2][2]
-    
+
     while r:pos() < h[1][1] + h[1][2] do
         local str = r:str()
         table.insert(t, str)
@@ -86,7 +110,7 @@ function CR2W.read_header()
             end
             table.insert(t, tt)
             if DBG > 1 then
-                print("", table.concat(tt, ", "))
+                print("", j-1, table.concat(tt, ", "))
             end
         end
         table.insert(header, t)
@@ -103,26 +127,58 @@ local function tab()
     io.write(string.rep("    ", l))
 end
 
-local function func(typ)
-    for t1, t2 in string.gmatch(typ, "(%a+):(.+)") do
-        if t1 == "array" then
-            io.write("array {\n")
-            for d1, d2, t3 in string.gmatch(t2, "(%d+),(%d+),(.+)") do
-                func(t3)
-            end
-            io.write("}")
-        elseif t1 == "ptr" then
-            io.write(t2)
-        elseif t1 == "handle" then
-            io.write(t2)
+local function read_value(typ, size, separator)
+    local res, err = pcall(CR2W[typ])
+
+    if res == true then
+        io.write(separator or "")
+    else
+        io.write("nil" .. (separator or ""))
+        io.write("\t-- !!! skip " .. size .." bytes ")
+
+        if DBG == 0 then
+            io.write("(" .. typ .. ") ")
         end
-        io.write("\n")
-        return
+
+        local pos = r:pos()
+
+        local sz = math.min(size, 12)
+        for i = 1, sz do
+            local b = r:uint8()
+            io.write(string.format("%02X ", b))
+        end
+        if size > 12 then
+            io.write("...")
+        end
+
+        io.stderr:write("ERR: unknown type '" .. typ .. "' at offset " .. pos .. "\n")
+        -- skip this data
+        local jmp = pos + size
+        r:seek(jmp)
     end
-    print(typ)
 end
 
-local function read_type_val(var, separator)
+
+local function parse_type(typ, separator)
+    for t1, t2 in string.gmatch(typ, "(%a+):(.+)") do
+        if t1 == "array" then
+            for d1, d2, t3 in string.gmatch(t2, "(%d+),(%d+),(.+)") do
+                CR2W.Array(d1, d2, t3)
+            end
+        elseif t1 == "ptr" then
+            CR2W.ptr(separator)
+        elseif t1 == "handle" then
+            CR2W.handle(separator)
+        else
+            assert(false, "unknown type '" .. t1 .. "'")
+        end
+        return true
+    end
+    return false
+end
+
+
+local function read_type(var, separator)
     local typ = r:uint16()
     local size = r:uint32() - 4
 
@@ -130,55 +186,18 @@ local function read_type_val(var, separator)
     var = header[1][var+1]
 
     if DBG > 0 then
-        io.write("type = " .. typ .. ", size = " .. size .. "\n")
+        io.write("type = '" .. typ .. "', size = " .. size .. "\n")
     end
 
     tab()
     io.write(var .. " = ")
-    
-    
 
-    if string.sub(typ, 1, 6) == "array:" then
-        for d1, d2, t2 in string.gmatch(typ, "array:(%d+),(%d+),(.+)") do
-            CR2W.Array(size, d1, d2, t2)
-        end
-    elseif string.sub(typ, 1, 4) == "ptr:" then
-        for t2 in string.gmatch(typ, "ptr:(.+)") do
-            CR2W.ptr(t2)
-        end
-    elseif string.sub(typ, 1, 7) == "handle:" then
-        for t2 in string.gmatch(typ, "handle:(.+)") do
-            CR2W.handle(t2)
-        end
-
-    else
-        if not (pcall(CR2W[typ], size)) then
-            io.write("nil" .. (separator or ""))
-            io.write("\t-- !!! skip " .. size .." bytes ")
-            
-            if DBG == 0 then
-                io.write("(" .. typ .. ") ")
-            end
-
-            local pos = r:pos()
-            local sz = size
-            if sz > 12 then sz = 12 end
-            for i = 1, sz do
-                local b = r:uint8()
-                io.write(string.format("%02X ", b))
-            end
-            if size > 12 then
-                io.write("...")
-            end
-
-            io.stderr:write("ERR: unknown type '" .. typ .. "' at offset " .. pos .. "\n")
-            -- skip this data
-            local jmp = pos + size
-            r:seek(jmp)
-        end
+    local res = parse_type(typ, separator)
+    if not res then
+        read_value(typ, size, separator)
     end
 
-    io.write((separator or "") .. "\n")
+    io.write("\n")
 end
 
 
@@ -195,7 +214,9 @@ local function read_var(separator)
         end
         return false
     end
-    read_type_val(var, separator)
+
+    read_type(var, separator)
+
     return true
 end
 
@@ -239,12 +260,17 @@ function CR2W.Uint32()
     io.write(val)
 end
 
+function CR2W.Uint64()
+    local val = r:uint64()
+    io.write(val)
+end
+
 function CR2W.Float()
     local val = r:float()
     io.write(val)
 end
 
-function CR2W.String(size)
+function CR2W.String()
     local len = r:uint8()
 
     assert(len >= 128)
@@ -255,65 +281,91 @@ function CR2W.String(size)
     end
 
     local val = r:str(len)
+    val = string.gsub(val, "\\", "/")
     io.write("\"" .. val .. "\"")
 end
 
-function CR2W.CName(size)
+function CR2W.CName()
     local val = r:uint16()
     val = header[1][val+1]
+    val = string.gsub(val, "\\", "/")
     io.write("\"" .. val .. "\"")
 end
 
+function CR2W.CGUID()
+    io.write("\"")
+    for i = 1, 4 do
+        io.write(r:hex32())
+    end
+    io.write("\"")
+end
 
-function CR2W.Vector(size)
-    local stop = r:pos() + size
+function CR2W.Vector()
+    --local stop = r:pos() + size
     assert(0 == r:uint8())
     io.write("{\n")
     l = l + 1
-    while r:pos() < stop do
-        read_var(",")
-    end
+    --while r:pos() < stop do
+    while read_var(",") do end
+    --end
     l = l - 1
     tab()
     io.write("}")
 end
 
-function CR2W.EulerAngles(size)                 CR2W.Vector(size) end
-function CR2W.CWorldShadowConfig(size)          CR2W.Vector(size) end
-function CR2W.SWorldEnvironmentParameters(size) CR2W.Vector(size) end
-function CR2W.CGlobalLightingTrajectory(size)   CR2W.Vector(size) end
-function CR2W.SSimpleCurve(size)                CR2W.Vector(size) end
-function CR2W.SGlobalSpeedTreeParameters(size)  CR2W.Vector(size) end
-function CR2W.SWorldSkyboxParameters(size)      CR2W.Vector(size) end
-function CR2W.SWorldRenderSettings(size)        CR2W.Vector(size) end
-function CR2W.CGenericGrassMask(size)           CR2W.Vector(size) end
---function CR2W.(size) CR2W.Vector(size) end
+function CR2W.EulerAngles()                 CR2W.Vector() end
+function CR2W.CWorldShadowConfig()          CR2W.Vector() end
+function CR2W.SWorldEnvironmentParameters() CR2W.Vector() end
+function CR2W.CGlobalLightingTrajectory()   CR2W.Vector() end
+function CR2W.SSimpleCurve()                CR2W.Vector() end
+function CR2W.SGlobalSpeedTreeParameters()  CR2W.Vector() end
+function CR2W.SWorldSkyboxParameters()      CR2W.Vector() end
+function CR2W.SWorldRenderSettings()        CR2W.Vector() end
+function CR2W.CGenericGrassMask()           CR2W.Vector() end
+function CR2W.Box()                         CR2W.Vector() end
+function CR2W.SMeshCookedData()             CR2W.Vector() end
+function CR2W.Color()                       CR2W.Vector() end
 
 
-function CR2W.ptr(t2)
+function CR2W.DeferredDataBuffer()  CR2W.Int16() end
+
+function CR2W.ELayerBuildTag()      CR2W.CName() end
+function CR2W.ELayerType()          CR2W.CName() end
+function CR2W.EMeshVertexType()     CR2W.CName() end
+function CR2W.ETextureCompression() CR2W.CName() end
+
+--function CR2W.() CR2W.() end
+
+
+
+function CR2W.ptr(separator)
     local val = r:sint32()
-    io.write(val .. "\t-- ptr to chunk_" .. val)
+    local sep = separator or ""
+    io.write(val .. sep .. "\t-- ptr to chunk_" .. val)
 end
 
-function CR2W.handle(t2)
+function CR2W.handle(separator)
     local val = r:sint32()
+    local sep = separator or ""
     if val < 0 then
-        local idx = val - #header[2]
-        io.write("\"" .. header[1][-idx] .. "\"")
+        local idx = #header[2] - val
+        val = header[1][idx]
+        val = string.gsub(val, "\\", "/")
+        io.write("\"" .. val .. "\"" .. sep)
     else
-        io.write(val .. "\t-- handle of chunk_" .. val)
+        io.write(val .. sep .. "\t-- handle of chunk_" .. val)
     end
 end
 
-function CR2W.TagList(size)
+function CR2W.TagList()
     local count = r:uint8()
     io.write("{\n")
     l = l + 1
     tab()
-    CR2W.CName(size)
+    CR2W.CName()
     for i = 2, count do
         io.write(", ")
-        CR2W.CName(size)
+        CR2W.CName()
     end
     io.write("\n")
     l = l - 1
@@ -321,30 +373,35 @@ function CR2W.TagList(size)
     io.write("}")
 end
 
+--function CR2W.Color()
+--    for i = 1, 
 
-function CR2W.Array(size, d1, d2, t2)
-    local stop = r:pos() + size
+
+function CR2W.Array(d1, d2, t2)
     local count = r:uint32()
     io.write("{ -- " .. count .. " element[s] of '" .. t2 .. "'\n")
     l = l + 1
     for i = 1, count do
         tab()
-        if t2 == "CName" then
-            CR2W.CName(size)
-            io.write(",\n")
+        local res = parse_type(t2, ",")
+        if res then
+            io.write("\n")
         else
-            assert(0 == r:uint8())
-            io.write("[" .. i .. "] = {\n")
-            l = l + 1
-            while read_var(",") do end
-            l = l - 1
-            tab()
-            io.write("},\n")
+            local res, err = pcall(CR2W[t2])
+            if not res then
+                assert(0 == r:uint8())
+                io.write("[" .. i .. "] = {\n")
+                l = l + 1
+                while read_var(",") do end
+                l = l - 1
+                tab()
+                io.write("},\n")
+            end
         end
     end
     l = l - 1
     tab()
-    io.write("}")
+    io.write("},")
 end
 
 
@@ -353,15 +410,63 @@ end
 
 function CR2W.start_parse()
     local chunks = #header[5]
+    io.write("chunk = {}\t-- " .. chunks .. " element[s]\n")
+
     for i = 1, chunks do
-        r:seek(header[5][i][4])
-        print("\n-- " .. r:pos() .. ": [[ chunk_" .. i .. " ]]\n")
+        local offset = header[5][i][4]
+        local size = header[5][i][3]
+
+        r:seek(offset)
+        io.write("chunk[" .. i .. "] = {\t-- ")
+        if DBG > 0 then
+            io.write(r:pos() .. ": ")
+        end
+        io.write(size)
+        io.write(" bytes, chunk_" .. i .. "\n")
+
         r:uint8()   -- \x00
-        while read_var() do end
+        while read_var(",") do end
+
+        io.write("}\n")
+
+        local left = size - (r:pos() - offset)
+        if left ~= 0 then
+            io.write("-- !!! left " .. left .. " of unreaded bytes !!!\n")
+        end
+
+        --goto skip
+
+        if (header[5][i][1] & 0xffff) == 4 then
+            io.write("unused[" .. i .. "] = {\n")
+            local count = r:uint32()
+            for j = 1, count do
+                tab()
+                io.write("-- " .. r:pos() .. ": ")
+                local size = r:uint32()
+                io.write(size .. " bytes, ")
+
+                local var = r:uint16()
+                var = header[1][var+1]
+
+                local typ = r:uint16()
+                typ = header[1][typ+1]
+
+                io.write("type = '" .. typ .. "'\n")
+
+                tab()
+                io.write(var .. " = ")
+
+                local res = parse_type(typ, ",")
+                if not res then
+                    --pcall(CR2W[typ])
+                    read_value(typ, size-8, ",")
+                end
+
+                io.write("\n")
+            end
+            io.write("}\n")
+        end
+
+        ::skip::
     end
 end
-
---for k, v in pairs(_G) do
---    print(k, v)
---end
-
