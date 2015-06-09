@@ -75,6 +75,22 @@ function BinaryReader:sint32(endian_big)  -- signed integer
     end
 end
 
+function BinaryReader:uint64(endian_big)  -- unsigned long long integer
+    if endian_big then
+        return string.unpack(">I8", self.f_handle:read(8))
+    else
+        return string.unpack("<I8", self.f_handle:read(8))
+    end
+end
+
+function BinaryReader:sint64(endian_big)  -- signed long long integer
+    if endian_big then
+        return string.unpack(">i8", self.f_handle:read(8))
+    else
+        return string.unpack("<i8", self.f_handle:read(8))
+    end
+end
+
 function BinaryReader:hex32(inverse)  -- hex
     local b1, b2, b3, b4 = string.byte(self.f_handle:read(4), 1, 4)
     local h32
