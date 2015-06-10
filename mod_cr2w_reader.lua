@@ -288,7 +288,8 @@ end
 
 local function read_type(var, separator)
     local typ = r:uint16()
-    --assert(0 ~= typ, "\n\n" .. r:pos()-2 ..": ERROR: type == 0\n")
+    assert(0 ~= typ, "\n\n" .. r:pos()-2 ..": ERROR: type == 0\n")
+    --[[
     if typ == 0 then
         local unk = r:uint32()
         io.write("!!! unknown data, " .. var .. " bytes\n")
@@ -319,6 +320,7 @@ local function read_type(var, separator)
         --io.write("\n")
         return false 
     end
+    --]]
 
     local size = r:uint32() - 4
 
@@ -479,6 +481,40 @@ end
 
 -- other types ----------------------------------------------------------------
 
+function CR2W_type.DeferredDataBuffer()         CR2W_type.Int16() end
+
+local generator_Vector = {
+    "ApertureDofParams", "Box", "Color", "EulerAngles", "Vector2",
+    "CEventGeneratorCameraParams", "CGenericGrassMask", "CGlobalLightingTrajectory",
+    "CWorldShadowConfig", "SAnimationBufferBitwiseCompressedData",
+    "SAnimationBufferBitwiseCompressionSettings", "SAttachmentReplacements",
+    "SDismembermentWoundDecal", "SDynamicDecalMaterialInfo", "SFoliageLODSetting",
+    "SGlobalSpeedTreeParameters", "SLensFlareGroupsParameters", "SLensFlareParameters",
+    "SLightFlickering", "SMeshCookedData", "SMultiCurve", "SSimpleCurve",
+    "SWorldEnvironmentParameters", "SWorldMotionBlurSettings", "SWorldRenderSettings",
+    "SWorldSkyboxParameters"
+}
+for k, v in ipairs(generator_Vector) do
+    CR2W_type[v] = function() CR2W_type.Vector() end
+end
+
+local generator_CName = {
+    "EActorImmortalityMode", "EAIAttitude", "EAreaName", "ECameraPlane", "ECompareFunc",
+    "ECompareOp", "ECurveBaseType", "ECurveRelativeMode", "ECurveType", "ECurveValueType",
+    "EDoorQuestState", "EFocusModeVisibility",
+    "EInteractionPriority", "EPhantomShape", "EFocusClueAttributeAction",
+    "ELayerBuildTag", "ELayerMergedContent", "ELayerType", "ELightChannel",
+    "ELogicOperation", "EMeshVertexType",
+    "EShowFlags", "eQuestType", "EQueryFact",
+    "ERenderDynamicDecalProjection",
+    "EStorySceneOutputAction", "ETextureCompression",
+    "SAnimationBufferBitwiseCompressionPreset",
+    "SAnimationBufferOrientationCompressionMethod",
+}
+for k, v in ipairs(generator_CName) do
+    CR2W_type[v] = function() CR2W_type.CName() end
+end
+
 function CR2W_type.CGUID()
     io.write("\"")
     for i = 1, 4 do
@@ -508,71 +544,6 @@ function CR2W_type.LocalizedString()
     io.write(string.format("0x%08x", val))
 end
 
---local function Floats(count)
---    CR2W.Uint8()
---    io.write("\t-- ")
---    l = l + 1
---    for i = 1, count do
---        read_value("Float", 4, " ")
---    end
---    l = l - 1
---end
-
---function CR2W_type.EngineTransform()
---    local count = r:uint8()
---    for i = 1, count do
---        io.write("{")
---        CR2W_type.Float()
---        io.write(", ")
---        CR2W_type.Float()
---        io.write(", ")
---        CR2W_type.Float()
---        io.write("}")
---    end
---end
-
-function CR2W_type.ApertureDofParams()           CR2W_type.Vector() end
-function CR2W_type.Box()                         CR2W_type.Vector() end
-function CR2W_type.Color()                       CR2W_type.Vector() end
-function CR2W_type.EulerAngles()                 CR2W_type.Vector() end
-
-function CR2W_type.Vector2()                     CR2W_type.Vector() end
-function CR2W_type.CEventGeneratorCameraParams() CR2W_type.Vector() end
-function CR2W_type.CGenericGrassMask()           CR2W_type.Vector() end
-function CR2W_type.CGlobalLightingTrajectory()   CR2W_type.Vector() end
-function CR2W_type.CWorldShadowConfig()          CR2W_type.Vector() end
-
---function CR2W_type.SAppearanceAttachments()      CR2W_type.Vector() end
-
-function CR2W_type.SAttachmentReplacements()     CR2W_type.Vector() end
-function CR2W_type.SLightFlickering()            CR2W_type.Vector() end
-
-function CR2W_type.SAnimationBufferBitwiseCompressedData() CR2W_type.Vector() end
-function CR2W_type.SAnimationBufferBitwiseCompressionSettings() CR2W_type.Vector() end
-
-function CR2W_type.SDynamicDecalMaterialInfo()   CR2W_type.Vector() end
-function CR2W_type.SDismembermentWoundDecal()    CR2W_type.Vector() end
-function CR2W_type.SFoliageLODSetting()          CR2W_type.Vector() end
-function CR2W_type.SGlobalSpeedTreeParameters()  CR2W_type.Vector() end
-function CR2W_type.SLensFlareGroupsParameters()  CR2W_type.Vector() end
-function CR2W_type.SLensFlareParameters()        CR2W_type.Vector() end
-function CR2W_type.SMeshCookedData()             CR2W_type.Vector() end
-function CR2W_type.SMultiCurve()                 CR2W_type.Vector() end
-function CR2W_type.SSimpleCurve()                CR2W_type.Vector() end
-function CR2W_type.SWorldEnvironmentParameters() CR2W_type.Vector() end
-function CR2W_type.SWorldMotionBlurSettings()    CR2W_type.Vector() end
-function CR2W_type.SWorldRenderSettings()        CR2W_type.Vector() end
-function CR2W_type.SWorldSkyboxParameters()      CR2W_type.Vector() end
-
--- TODO:
--- [%d]%s
-
--- binary data
--- DataBuffer
--- LongBitField
-
-function CR2W_type.DeferredDataBuffer()         CR2W_type.Int16() end
-
 function CR2W_type.CDateTime()
     --CR2W_type.Uint64()
     local t = r:uint32()
@@ -580,22 +551,6 @@ function CR2W_type.CDateTime()
     io.write(t)
 end
 
-local generator_CName = {
-    "EActorImmortalityMode", "EAIAttitude", "EAreaName", "ECameraPlane", "ECompareFunc",
-    "ECompareOp", "ECurveBaseType", "ECurveRelativeMode", "ECurveType", "ECurveValueType",
-    "EDoorQuestState",
-    "EInteractionPriority", "EPhantomShape", "EFocusClueAttributeAction",
-    "ELayerBuildTag", "ELayerMergedContent", "ELayerType", "ELightChannel", "ELogicOperation", 
-    "EMeshVertexType",
-    "EShowFlags", "eQuestType", "EQueryFact",
-    "ERenderDynamicDecalProjection",
-    "EStorySceneOutputAction", "ETextureCompression",
-    "SAnimationBufferBitwiseCompressionPreset",
-    "SAnimationBufferOrientationCompressionMethod",
-}
-for k, v in ipairs(generator_CName) do
-    CR2W_type[v] = function() CR2W_type.CName() end
-end
 
 local function Flags()
     io.write("{\n")
@@ -679,8 +634,7 @@ local function unused_data1()
         tab()
         io.write(var .. " = ")
 
-        local res = parse_type(typ, ",")
-        if not res then
+        if not parse_type(typ, ",") then
             --pcall(CR2W[typ])
             read_value(typ, size-8, ",")
         end
@@ -706,7 +660,7 @@ function CR2W.start_parse()
         io.write(size)
         io.write(" bytes, chunk_" .. i .. "\n")
 
-        local zero = r:uint8()   -- \x00
+        local zero = r:uint8()
         if zero == 0 then
             while read_var(",") do end
         else
