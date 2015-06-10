@@ -74,7 +74,7 @@ function CR2W.read_header()
     local count = h[2][2]
     r:seek(start)
 
-    dbg(0, "--[[ " .. r:pos() .. ": strings buffer, " .. count .. " item[s]\n")
+    dbg(1, "--[[ " .. r:pos() .. ": strings buffer, " .. count .. " item[s]\n")
     for i = 1, count do
         local offs = r:uint32()
         local crc = r:uint32()
@@ -87,13 +87,13 @@ function CR2W.read_header()
         table.insert(strings, {str = str, crc = crc})
     end
 
-    if DBG > 0 then
+    if DBG > 1 then
         for i = 1, count do
             io.write(string.format("[%4d] 0x%08X '%s'\n",
                     i, strings[i].crc, strings[i].str))
         end
     end
-    dbg(0, "--]]\n")
+    dbg(1, "--]]\n")
 
 
     -- parse handles ----------------------------------------------------------
@@ -103,7 +103,7 @@ function CR2W.read_header()
     count = h[3][2]
     r:seek(start)
 
-    dbg(0, "--[[ " .. r:pos() .. ": handles buffer, " .. count .. " items\n")
+    dbg(1, "--[[ " .. r:pos() .. ": handles buffer, " .. count .. " items\n")
     for i = 1, count do
         local offs = r:uint32()
         local ftype = r:uint32()    -- file type
@@ -116,13 +116,13 @@ function CR2W.read_header()
         table.insert(handles, {str = str, ftype = ftype})
     end
 
-    if DBG > 0 then
+    if DBG > 1 then
         for i = 1, count do
             io.write(string.format("[%4d] %3d '%s'\n",
                     i, handles[i].ftype, handles[i].str))
         end
     end
-    dbg(0, "--]]\n")
+    dbg(1, "--]]\n")
 
     -- parse block_4 ----------------------------------------------------------
     block_4 = {}
@@ -131,7 +131,7 @@ function CR2W.read_header()
     count = h[4][2]
     r:seek(start)
 
-    dbg(0, "--[[ " .. r:pos() .. ": block_4, " .. count .. " item[s]\n")
+    dbg(1, "--[[ " .. r:pos() .. ": block_4, " .. count .. " item[s]\n")
     for i = 1, count do
         local t = {}
         for i = 1, 4 do
@@ -141,13 +141,13 @@ function CR2W.read_header()
         table.insert(block_4, t)
     end
 
-    if DBG > 0 then
+    if DBG > 1 then
         for i = 1, count do
             io.write(string.format("[%4d] %s\n",
                     i, table.concat(block_4[i], ", ")))
         end
     end
-    dbg(0, "--]]\n")
+    dbg(1, "--]]\n")
 
     -- parse chunks -----------------------------------------------------------
     chunks = {}
@@ -156,7 +156,7 @@ function CR2W.read_header()
     count = h[5][2]
     r:seek(start)
 
-    dbg(0, "--[[ " .. r:pos() .. ": chunks, " .. count .. " item[s]\n")
+    dbg(1, "--[[ " .. r:pos() .. ": chunks, " .. count .. " item[s]\n")
     for i = 1, count do
         local t = {}
         t.u16_1 = r:uint16()
@@ -169,7 +169,7 @@ function CR2W.read_header()
         table.insert(chunks, t)
     end
 
-    if DBG > 0 then
+    if DBG > 1 then
         for i = 1, count do
             local t = chunks[i]
             io.write(string.format("[%4d] %4d, 0x%04X, %4d, %8d, %8d, %4d, 0x%08X\n",
@@ -177,7 +177,7 @@ function CR2W.read_header()
                 ))
         end
     end
-    dbg(0, "--]]\n")
+    dbg(1, "--]]\n")
 
     -- parse block_6 ----------------------------------------------------------
     block_6 = {}
@@ -186,7 +186,7 @@ function CR2W.read_header()
     count = h[6][2]
     r:seek(start)
 
-    dbg(0, "--[[ " .. r:pos() .. ": block_6, " .. count .. " item[s]\n")
+    dbg(1, "--[[ " .. r:pos() .. ": block_6, " .. count .. " item[s]\n")
     for i = 1, count do
         local t = {}
         t.u32_1 = r:uint32()
@@ -198,7 +198,7 @@ function CR2W.read_header()
         table.insert(chunks, t)
     end
 
-    if DBG > 0 then
+    if DBG > 1 then
         for i = 1, count do
             local t = block_6[i]
             io.write(string.format("[%4d] %4d, %4d, %4d, %8d, %8d, 0x%08X\n",
@@ -206,7 +206,7 @@ function CR2W.read_header()
                 ))
         end
     end
-    dbg(0, "--]]\n")
+    dbg(1, "--]]\n")
 
     -- parse block_7-10 -------------------------------------------------------
     -- TODO:
@@ -221,17 +221,17 @@ end
 local function read_unknown_bytes(size, typ)
     local pos = r:pos()
 
-    local sz = math.min(size, 12)
+    local sz = math.min(size, 24)
     for i = 1, sz do
         local b = r:uint8()
         io.write(string.format("%02X ", b))
     end
-    if size > 12 then
+    if size > 24 then
         io.write("...")
     end
 
     if typ then
-        io.stderr:write("ERR: unknown type '" .. typ .. "' at offset " .. pos .. "\n")
+        io.stderr:write("WARN: unknown type '" .. typ .. "' at offset " .. pos .. "\n")
     end
 
     -- skip this data
@@ -252,6 +252,9 @@ local function read_value(typ, size, separator)
         if DBG == 0 then
             io.write("(" .. typ .. ") ")
         end
+        io.write("\n")
+        tab()
+        io.write("-- ")
 
         read_unknown_bytes(size, typ)
     end
@@ -282,6 +285,38 @@ end
 
 local function read_type(var, separator)
     local typ = r:uint16()
+    --assert(0 ~= typ, "\n\n" .. r:pos()-2 ..": ERROR: type == 0\n")
+    if typ == 0 then
+        local unk = r:uint32()
+        io.write("!!! unknown data, " .. var .. " bytes\n")
+        tab()
+        io.write("-- ??? ".. unk .. "\n")
+
+        while true do
+            local var = r:uint16()
+            local typ = r:uint16()
+            if var == 0 and typ == 0 then break end
+            local size = r:uint32() - 4
+            
+            typ = strings[typ+1].str
+            var = strings[var+1].str
+            
+            tab()
+            io.write("-- " .. r:pos() .. ":")
+            dbg(0, " type = '" .. typ .. "', size = " .. size .. "\n")
+            tab()
+            io.write(var .. " = ")
+            if not parse_type(typ, separator) then
+                read_value(typ, size, separator)
+            end
+            io.write("\n")
+        end
+        tab()
+        io.write("-- " .. r:pos() .. ": !!! end of unknown data\n")
+        --io.write("\n")
+        return false 
+    end
+
     local size = r:uint32() - 4
 
     typ = strings[typ+1].str
@@ -290,14 +325,29 @@ local function read_type(var, separator)
     dbg(0, "type = '" .. typ .. "', size = " .. size .. "\n")
 
     tab()
+    
+    -- workaround for spaces in variable names
+    if string.find(var, " ") then
+        var = "['" .. var .. "']"
+    end
+    
     io.write(var .. " = ")
 
-    local res = parse_type(typ, separator)
-    if not res then
-        read_value(typ, size, separator)
+    -- skip big data 
+    if var == "flatCompiledData" then
+        io.write("{},\t-- !!! skip " .. size .. " bytes (" .. typ .. ")\n")
+        tab()
+        io.write("-- ")
+        read_unknown_bytes(size)
+    else
+        local res = parse_type(typ, separator)
+        if not res then
+            read_value(typ, size, separator)
+        end
     end
 
     io.write("\n")
+    return true
 end
 
 
@@ -313,9 +363,7 @@ local function read_var(separator)
         return false
     end
 
-    read_type(var, separator)
-
-    return true
+    return read_type(var, separator)
 end
 
 
@@ -398,7 +446,7 @@ function CR2W_type.CName()
 end
 
 function CR2W_type.Vector(idx)
-    assert(0 == r:uint8())
+    assert(0 == r:uint8(), "\n\n" .. r:pos()-1 ..": ERROR: first byte of Vector is not zero\n")
     if idx then
         io.write("[" .. idx .. "] = ")
     end
@@ -485,17 +533,24 @@ function CR2W_type.Box()                         CR2W_type.Vector() end
 function CR2W_type.Color()                       CR2W_type.Vector() end
 function CR2W_type.EulerAngles()                 CR2W_type.Vector() end
 
+function CR2W_type.Vector2()                     CR2W_type.Vector() end
+
 function CR2W_type.CEventGeneratorCameraParams() CR2W_type.Vector() end
 function CR2W_type.CGenericGrassMask()           CR2W_type.Vector() end
 function CR2W_type.CGlobalLightingTrajectory()   CR2W_type.Vector() end
 function CR2W_type.CWorldShadowConfig()          CR2W_type.Vector() end
 
+--function CR2W_type.SAppearanceAttachments()      CR2W_type.Vector() end
+
 function CR2W_type.SAttachmentReplacements()     CR2W_type.Vector() end
+function CR2W_type.SDynamicDecalMaterialInfo()   CR2W_type.Vector() end
+function CR2W_type.SDismembermentWoundDecal()    CR2W_type.Vector() end
 function CR2W_type.SFoliageLODSetting()          CR2W_type.Vector() end
 function CR2W_type.SGlobalSpeedTreeParameters()  CR2W_type.Vector() end
 function CR2W_type.SLensFlareGroupsParameters()  CR2W_type.Vector() end
 function CR2W_type.SLensFlareParameters()        CR2W_type.Vector() end
 function CR2W_type.SMeshCookedData()             CR2W_type.Vector() end
+function CR2W_type.SMultiCurve()                 CR2W_type.Vector() end
 function CR2W_type.SSimpleCurve()                CR2W_type.Vector() end
 function CR2W_type.SWorldEnvironmentParameters() CR2W_type.Vector() end
 function CR2W_type.SWorldMotionBlurSettings()    CR2W_type.Vector() end
@@ -511,26 +566,40 @@ function CR2W_type.SWorldSkyboxParameters()      CR2W_type.Vector() end
 
 function CR2W_type.DeferredDataBuffer()         CR2W_type.Int16() end
 
-function CR2W_type.EActorImmortalityMode()      CR2W_type.CName() end
-function CR2W_type.EAIAttitude()                CR2W_type.CName() end
-function CR2W_type.EAreaName()                  CR2W_type.CName() end
-function CR2W_type.ECameraPlane()               CR2W_type.CName() end
-function CR2W_type.ECompareFunc()               CR2W_type.CName() end
-function CR2W_type.ECompareOp()                 CR2W_type.CName() end
-function CR2W_type.ECurveBaseType()             CR2W_type.CName() end
-function CR2W_type.EDoorQuestState()            CR2W_type.CName() end
-function CR2W_type.EFocusClueAttributeAction()  CR2W_type.CName() end
-function CR2W_type.ELayerBuildTag()             CR2W_type.CName() end
-function CR2W_type.ELayerMergedContent()        CR2W_type.CName() end
-function CR2W_type.ELayerType()                 CR2W_type.CName() end
-function CR2W_type.ELogicOperation()            CR2W_type.CName() end
-function CR2W_type.EMeshVertexType()            CR2W_type.CName() end
-function CR2W_type.eQuestType()                 CR2W_type.CName() end -- !!! small 'e'
-function CR2W_type.EQueryFact()                 CR2W_type.CName() end
-function CR2W_type.EStorySceneOutputAction()    CR2W_type.CName() end
-function CR2W_type.ETextureCompression()        CR2W_type.CName() end
 
---function CR2W.() CR2W.() end
+local generator_CName = {
+    "EActorImmortalityMode", "EAIAttitude", "EAreaName", "ECameraPlane", "ECompareFunc",
+    "ECompareOp", "ECurveBaseType", "ECurveRelativeMode", "ECurveType", "ECurveValueType",
+    "EDoorQuestState",
+    "EInteractionPriority", "EPhantomShape", "EFocusClueAttributeAction",
+    "ELayerBuildTag", "ELayerMergedContent", "ELayerType", "ELightChannel", "ELogicOperation", 
+    "EMeshVertexType",
+    "EShowFlags", "eQuestType", "EQueryFact",
+    "ERenderDynamicDecalProjection",
+    "EStorySceneOutputAction", "ETextureCompression"
+}
+for k, v in ipairs(generator_CName) do
+    CR2W_type[v] = function() CR2W_type.CName() end
+end
+
+local function Flags()
+    io.write("{\n")
+    l = l + 1
+    tab()
+    while true do
+        local val = r:uint16()
+        if val == 0 then break end
+        val = strings[val+1].str
+        io.write("\"" .. val .. "\", ")
+    end
+    io.write("\n")
+    l = l - 1
+    tab()
+    io.write("}")
+end
+
+
+function CR2W_type.EDrawableFlags() Flags() end
 
 -------------------------------------------------------------------------------
 
@@ -558,10 +627,8 @@ function CR2W_type.Array(d1, d2, t2, separator)
     l = l + 1
     for i = 1, count do
         tab()
-        local res = parse_type(t2, ",")
-        if not res then
-            local res, err = pcall(CR2W_type[t2])
-            if not res then
+        if not parse_type(t2, ",") then
+            if not pcall(CR2W_type[t2]) then
                 io.write("[" .. i .. "] = ")
                 CR2W_type.Vector()
             end
