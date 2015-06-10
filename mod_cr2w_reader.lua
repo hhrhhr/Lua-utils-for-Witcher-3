@@ -10,20 +10,23 @@ local chunks  = {}  -- block_5: ?, ?, size, offset, ?, CRC32
 local block_6 = {}  -- block_6: ???
 
 local r = 0         -- file handle
+local OFFSET = 0
 local DBG = 0       -- 0, 1, 2
 local l = 1         -- tab level
 
+
 local function dbg(d, ...)
-    if DBG > d then
+    if DBG >= d then
         io.write(...)
     end
 end
 
 
-function CR2W.init(file_handle, offset, debug)
+function CR2W.init(file_handle, debug_level, offset)
     r = file_handle
+    DBG = debug_level or 0
+    OFFSET = offset
     r:seek(offset or 0)
-    DBG = debug or 0
 end
 
 
@@ -52,18 +55,18 @@ function CR2W.read_header()
     end
 
     local h = {}
-    dbg(0, "\n id   off size      crc\n")
+    dbg(1, "\n id   off size      crc\n")
     for i = 1, 10 do
-        local offs = r:uint32()
+        local offs = r:uint32() + OFFSET
         local size = r:uint32()
         local crc = r:hex32(1)
         table.insert(h, {offs, size, crc})
-        dbg(0, string.format("%2d: %5d %4d %s\n", i, offs, size, crc))
+        dbg(1, string.format("%2d: %5d %4d %s\n", i, offs, size, crc))
         if i > 6 and size > 0 then
             io.write("!!! size not zero, unknown data !!!")
         end
     end
-    dbg(0, "--]]\n")
+    dbg(1, "--]]\n")
 
 
     -- parse strings ----------------------------------------------------------
@@ -74,7 +77,7 @@ function CR2W.read_header()
     local count = h[2][2]
     r:seek(start)
 
-    dbg(1, "--[[ " .. r:pos() .. ": strings buffer, " .. count .. " item[s]\n")
+    dbg(2, "--[[ " .. r:pos() .. ": strings buffer, " .. count .. " item[s]\n")
     for i = 1, count do
         local offs = r:uint32()
         local crc = r:uint32()
@@ -93,7 +96,7 @@ function CR2W.read_header()
                     i, strings[i].crc, strings[i].str))
         end
     end
-    dbg(1, "--]]\n")
+    dbg(2, "--]]\n")
 
 
     -- parse handles ----------------------------------------------------------
@@ -103,7 +106,7 @@ function CR2W.read_header()
     count = h[3][2]
     r:seek(start)
 
-    dbg(1, "--[[ " .. r:pos() .. ": handles buffer, " .. count .. " items\n")
+    dbg(2, "--[[ " .. r:pos() .. ": handles buffer, " .. count .. " items\n")
     for i = 1, count do
         local offs = r:uint32()
         local ftype = r:uint32()    -- file type
@@ -122,7 +125,7 @@ function CR2W.read_header()
                     i, handles[i].ftype, handles[i].str))
         end
     end
-    dbg(1, "--]]\n")
+    dbg(2, "--]]\n")
 
     -- parse block_4 ----------------------------------------------------------
     block_4 = {}
@@ -131,7 +134,7 @@ function CR2W.read_header()
     count = h[4][2]
     r:seek(start)
 
-    dbg(1, "--[[ " .. r:pos() .. ": block_4, " .. count .. " item[s]\n")
+    dbg(2, "--[[ " .. r:pos() .. ": block_4, " .. count .. " item[s]\n")
     for i = 1, count do
         local t = {}
         for i = 1, 4 do
@@ -147,7 +150,7 @@ function CR2W.read_header()
                     i, table.concat(block_4[i], ", ")))
         end
     end
-    dbg(1, "--]]\n")
+    dbg(2, "--]]\n")
 
     -- parse chunks -----------------------------------------------------------
     chunks = {}
@@ -156,14 +159,14 @@ function CR2W.read_header()
     count = h[5][2]
     r:seek(start)
 
-    dbg(1, "--[[ " .. r:pos() .. ": chunks, " .. count .. " item[s]\n")
+    dbg(2, "--[[ " .. r:pos() .. ": chunks, " .. count .. " item[s]\n")
     for i = 1, count do
         local t = {}
         t.u16_1 = r:uint16()
         t.u16_2 = r:uint16()
         t.u32_1 = r:uint32()
         t.size  = r:uint32()
-        t.offs  = r:uint32()
+        t.offs  = r:uint32() + OFFSET
         t.u32_2 = r:uint32()
         t.crc   = r:uint32()
         table.insert(chunks, t)
@@ -177,7 +180,7 @@ function CR2W.read_header()
                 ))
         end
     end
-    dbg(1, "--]]\n")
+    dbg(2, "--]]\n")
 
     -- parse block_6 ----------------------------------------------------------
     block_6 = {}
@@ -186,7 +189,7 @@ function CR2W.read_header()
     count = h[6][2]
     r:seek(start)
 
-    dbg(1, "--[[ " .. r:pos() .. ": block_6, " .. count .. " item[s]\n")
+    dbg(2, "--[[ " .. r:pos() .. ": block_6, " .. count .. " item[s]\n")
     for i = 1, count do
         local t = {}
         t.u32_1 = r:uint32()
@@ -195,9 +198,9 @@ function CR2W.read_header()
         t.size1 = r:uint32()
         t.size2 = r:uint32()
         t.crc   = r:uint32()
-        table.insert(chunks, t)
+        table.insert(block_6, t)
     end
-
+    
     if DBG > 1 then
         for i = 1, count do
             local t = block_6[i]
@@ -206,7 +209,7 @@ function CR2W.read_header()
                 ))
         end
     end
-    dbg(1, "--]]\n")
+    dbg(2, "--]]\n")
 
     -- parse block_7-10 -------------------------------------------------------
     -- TODO:
@@ -303,7 +306,7 @@ local function read_type(var, separator)
             
             tab()
             io.write("-- " .. r:pos() .. ":")
-            dbg(0, " type = '" .. typ .. "', size = " .. size .. "\n")
+            dbg(1, " type = '" .. typ .. "', size = " .. size .. "\n")
             tab()
             io.write(var .. " = ")
             if not parse_type(typ, separator) then
@@ -322,7 +325,7 @@ local function read_type(var, separator)
     typ = strings[typ+1].str
     var = strings[var+1].str
 
-    dbg(0, "type = '" .. typ .. "', size = " .. size .. "\n")
+    dbg(1, "type = '" .. typ .. "', size = " .. size .. "\n")
 
     tab()
     
@@ -359,7 +362,7 @@ local function read_var(separator)
 
     local var = r:uint16()
     if var == 0 then
-        dbg(0, "EOB\n")
+        dbg(1, "EOB\n")
         return false
     end
 
@@ -464,7 +467,7 @@ function CR2W_type.CVariant()
 
     typ = strings[typ+1].str
 
-    dbg(0, "\t-- type = '" .. typ .. "', size = " .. size .. "\n")
+    dbg(1, "\t-- type = '" .. typ .. "', size = " .. size .. "\n")
     l = l + 1
     tab()
     local res = parse_type(typ)
@@ -534,7 +537,6 @@ function CR2W_type.Color()                       CR2W_type.Vector() end
 function CR2W_type.EulerAngles()                 CR2W_type.Vector() end
 
 function CR2W_type.Vector2()                     CR2W_type.Vector() end
-
 function CR2W_type.CEventGeneratorCameraParams() CR2W_type.Vector() end
 function CR2W_type.CGenericGrassMask()           CR2W_type.Vector() end
 function CR2W_type.CGlobalLightingTrajectory()   CR2W_type.Vector() end
@@ -543,6 +545,11 @@ function CR2W_type.CWorldShadowConfig()          CR2W_type.Vector() end
 --function CR2W_type.SAppearanceAttachments()      CR2W_type.Vector() end
 
 function CR2W_type.SAttachmentReplacements()     CR2W_type.Vector() end
+function CR2W_type.SLightFlickering()            CR2W_type.Vector() end
+
+function CR2W_type.SAnimationBufferBitwiseCompressedData() CR2W_type.Vector() end
+function CR2W_type.SAnimationBufferBitwiseCompressionSettings() CR2W_type.Vector() end
+
 function CR2W_type.SDynamicDecalMaterialInfo()   CR2W_type.Vector() end
 function CR2W_type.SDismembermentWoundDecal()    CR2W_type.Vector() end
 function CR2W_type.SFoliageLODSetting()          CR2W_type.Vector() end
@@ -566,6 +573,12 @@ function CR2W_type.SWorldSkyboxParameters()      CR2W_type.Vector() end
 
 function CR2W_type.DeferredDataBuffer()         CR2W_type.Int16() end
 
+function CR2W_type.CDateTime()
+    --CR2W_type.Uint64()
+    local t = r:uint32()
+    t = (t << 32) + r:uint32()
+    io.write(t)
+end
 
 local generator_CName = {
     "EActorImmortalityMode", "EAIAttitude", "EAreaName", "ECameraPlane", "ECompareFunc",
@@ -576,7 +589,9 @@ local generator_CName = {
     "EMeshVertexType",
     "EShowFlags", "eQuestType", "EQueryFact",
     "ERenderDynamicDecalProjection",
-    "EStorySceneOutputAction", "ETextureCompression"
+    "EStorySceneOutputAction", "ETextureCompression",
+    "SAnimationBufferBitwiseCompressionPreset",
+    "SAnimationBufferOrientationCompressionMethod",
 }
 for k, v in ipairs(generator_CName) do
     CR2W_type[v] = function() CR2W_type.CName() end
@@ -597,7 +612,6 @@ local function Flags()
     tab()
     io.write("}")
 end
-
 
 function CR2W_type.EDrawableFlags() Flags() end
 
@@ -687,7 +701,7 @@ function CR2W.start_parse()
         r:seek(offset)
         io.write("chunk[" .. i .. "] = {\t-- ")
 
-        dbg(0, r:pos() .. ": ")
+        dbg(1, r:pos() .. ": ")
 
         io.write(size)
         io.write(" bytes, chunk_" .. i .. "\n")
