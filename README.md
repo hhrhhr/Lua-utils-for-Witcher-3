@@ -8,11 +8,15 @@
 
 #### inspect_cr2w.lua
 ````
-lua inspect_cr2w.lua path_to.cr2w [debug_level [offset]]
+lua inspect_cr2w.lua path_to.cr2w [debug_level [offset]] [> output_file.lua]
 ````
 *debug_level*: 0 — no debug (default), 1 — show type of variables, 2 — add headers dump
+
 *offset*: default is 0
-generates Lua–compatible code with parsed values
+
+*output_file.lua*: default output to ````stdout````.
+
+generates Lua–compatible code with parsed values.
 
 #### inspect_w3speech.lua
 ````
@@ -25,8 +29,8 @@ retrieves a pair of .wav and cr2w files
 lua inspect_w3strings.lua path_to.w3.strings [output_file [debug]]
 ````
 *output_file* — default is *./strings_utf16le.txt*
-*debug* — enable headers dump
 
+*debug* — enable headers dump
 
 #### inspect_textures.lua
 ````
@@ -39,7 +43,9 @@ shows headers from *texture.cache*
 lua unpack_textures.lua path_to_texture.cache [output_dir [mips]]
 ````
 *output_dir*: default is "."
+
 *mips*: save all mips, else only first
+
 unpacking textures and appending the necessary DDS-header. almost all *cubemaps* skipped due to uselessness (can be enabled by remove comment *-- skip tonns of envprobes*). All slashes in paths are replaced on "#", files are written to the same directory.
 
 #### unpack_potato.lua
