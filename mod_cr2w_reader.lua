@@ -45,8 +45,8 @@ function CR2W.read_header()
         print("id??", r:hex32() .. " " .. r:hex32())
         local s1 = r:uint32()
         local s2 = r:uint32()
-        print("size", s1 .. "\\" .. s2)
-        assert(s1 == s2)
+        assert(s1 == s2, "\n\n" .. s1 .. " ~= " .. s2 .. "\n")
+        print("size", s1)
         -- 0x0020
         print("unk1", r:hex32())
         print("unk2", r:uint32() .. "")
@@ -223,16 +223,35 @@ end
 
 local function read_unknown_bytes(size, typ)
     local pos = r:pos()
-
-    local sz = math.min(size, 24)
+    local sz = math.min(size, 64)
+    local hex, str = {}, {}
+    
     for i = 1, sz do
         local b = r:uint8()
-        io.write(string.format("%02X ", b))
+        table.insert(hex, string.format("%02X", b))
+        if b < 32 or b > 239 then b = 46 end
+        table.insert(str, string.char(b))
     end
-    if size > 24 then
-        io.write("...")
+    
+    local i = 1
+    while i < sz do
+        local j = math.min(i+15, sz)
+        
+        io.write(string.format("%08X: ", pos + i - 1))
+        io.write(table.concat(hex, " ", i, j))
+        local rep = 15 - sz + i
+        if rep < 16 then
+            io.write(string.rep("   ", rep))
+        end
+        io.write(" | ")
+        io.write(table.concat(str, "", i, j))
+        io.write("\n")
+        
+        i = i + 16
     end
-
+    
+    if size > 64 then io.write("...\n") end
+    
     if typ then
         io.stderr:write("WARN: unknown type '" .. typ .. "' at offset " .. pos .. "\n")
     end
@@ -244,22 +263,18 @@ end
 
 
 local function read_value(typ, size, separator)
-    local res, err = pcall(CR2W_type[typ])
-
-    if res == true then
+    if pcall(CR2W_type[typ]) then
         io.write(separator or "")
     else
         io.write("nil" .. (separator or ""))
-        io.write("\t-- !!! skip " .. size .." bytes ")
+        io.write("\t--[[ !!! skip " .. size .." bytes ")
 
         if DBG == 0 then
             io.write("(" .. typ .. ") ")
         end
         io.write("\n")
-        tab()
-        io.write("-- ")
-
         read_unknown_bytes(size, typ)
+        io.write("--]]")
     end
 end
 
@@ -278,7 +293,7 @@ local function parse_type(typ, separator)
             CR2W_type.Uint16()
             io.write(separator or "")
         else
-            assert(false, "unknown type '" .. t1 .. "'")
+            assert(false, "\n\nunknown type '" .. t1 .. "'\n")
         end
         return true
     end
@@ -289,37 +304,8 @@ end
 local function read_type(var, separator)
     local typ = r:uint16()
     assert(0 ~= typ, "\n\n" .. r:pos()-2 ..": ERROR: type == 0\n")
-    --[[
+    --[[ TODO:
     if typ == 0 then
-        local unk = r:uint32()
-        io.write("!!! unknown data, " .. var .. " bytes\n")
-        tab()
-        io.write("-- ??? ".. unk .. "\n")
-
-        while true do
-            local var = r:uint16()
-            local typ = r:uint16()
-            if var == 0 and typ == 0 then break end
-            local size = r:uint32() - 4
-            
-            typ = strings[typ+1].str
-            var = strings[var+1].str
-            
-            tab()
-            io.write("-- " .. r:pos() .. ":")
-            dbg(1, " type = '" .. typ .. "', size = " .. size .. "\n")
-            tab()
-            io.write(var .. " = ")
-            if not parse_type(typ, separator) then
-                read_value(typ, size, separator)
-            end
-            io.write("\n")
-        end
-        tab()
-        io.write("-- " .. r:pos() .. ": !!! end of unknown data\n")
-        --io.write("\n")
-        return false 
-    end
     --]]
 
     local size = r:uint32() - 4
@@ -345,8 +331,7 @@ local function read_type(var, separator)
         io.write("-- ")
         read_unknown_bytes(size)
     else
-        local res = parse_type(typ, separator)
-        if not res then
+        if not parse_type(typ, separator) then
             read_value(typ, size, separator)
         end
     end
@@ -423,7 +408,7 @@ end
 function CR2W_type.String()
     local len = r:uint8()
 
-    assert(len >= 128)
+    assert(len >= 128, "\n\n" .. r:pos()-1 .. ": ERROR: String lenght " .. len .. " >= 128\n")
     len = len - 128
     if len >= 64 then
         len = len - 64
@@ -472,8 +457,7 @@ function CR2W_type.CVariant()
     dbg(1, "\t-- type = '" .. typ .. "', size = " .. size .. "\n")
     l = l + 1
     tab()
-    local res = parse_type(typ)
-    if not res then
+    if not parse_type(typ) then
         read_value(typ, size)
     end
     l = l - 1
@@ -495,7 +479,7 @@ local generator_Vector = {
     "SWorldSkyboxParameters"
 }
 for k, v in ipairs(generator_Vector) do
-    CR2W_type[v] = function() CR2W_type.Vector() end
+    CR2W_type[v] = function(i) CR2W_type.Vector(i) end
 end
 
 local generator_CName = {
@@ -597,9 +581,8 @@ function CR2W_type.Array(d1, d2, t2, separator)
     for i = 1, count do
         tab()
         if not parse_type(t2, ",") then
-            if not pcall(CR2W_type[t2]) then
-                io.write("[" .. i .. "] = ")
-                CR2W_type.Vector()
+            if not pcall(CR2W_type[t2], i) then
+                CR2W_type.Vector(i)
             end
             io.write(",")
         end
@@ -635,7 +618,6 @@ local function unused_data1()
         io.write(var .. " = ")
 
         if not parse_type(typ, ",") then
-            --pcall(CR2W[typ])
             read_value(typ, size-8, ",")
         end
         io.write("\n")
@@ -672,9 +654,9 @@ function CR2W.start_parse()
         local pos = r:pos()
         local left = size - (pos - offset)
         if left ~= 0 then
-            io.write("-- " .. pos .. ": !!! left " .. left .. " unreaded bytes !!!\n-- ")
+            io.write("--[[ " .. pos .. ": !!! left " .. left .. " unreaded bytes !!!\n")
             read_unknown_bytes(left)
-            io.write("\n")
+            io.write("--]]\n")
         end
         io.write("\n")
 
