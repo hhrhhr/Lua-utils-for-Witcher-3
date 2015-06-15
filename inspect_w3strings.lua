@@ -8,26 +8,6 @@ local debug = arg[3] or false
 local r = BinaryReader
 r:open(in_file)
 
-local function bit6()
-    local result, shift, b, i = 0, 0, 0, 1
-    repeat
-        b = r:uint8()
-        if b == 128 then return 0 end
-        local s = 6
-        local mask = 255
-        if b > 127 then
-            mask = 127
-            s = 7
-        elseif b > 63 then
-            mask = 63
-        end
-        result = result | ((b & mask) << shift)
-        shift = shift + s
-        i = i + 1
-    until (b < 64) or (i == 3 and b < 128)
-    return result
-end
-
 local function toutf16le(str)
     local s = string.gsub(str, "(.)", "%1\x00")
     return s
@@ -35,20 +15,20 @@ end
 
 --[[
 char magic[4];      // "RTSW"
-int version;        // 162
-unsigned short key1;
+uint version;        // 162
+ushort key1;
 
 uint6 count1;       // count of string
 {
-    int str_id;     // ^key, unique
-    int offset;     // relative to start of utf[], must be multiple by 2
-    int strlen;     // number of UTF16 chars, without ending zeroes
+    uint str_id;     // ^key, unique
+    uint offset;     // relative to start of utf[], must be multiple by 2
+    uint strlen;     // number of UTF16 chars, without ending zeroes
 } // * count1
 
 uint6 count2;       
 {
     char unk[4]     // global id? crc? hash?
-    int str_id      // ^key, same with first block
+    uint str_id      // ^key, same with first block
 } // * count2
 
 uint6 count3;       // count of UTF16 chars (2 byte)
@@ -56,7 +36,7 @@ uint6 count3;       // count of UTF16 chars (2 byte)
     utf[count3 * 2] // \x00\x00 ended UTF16LE strings
 }
 
-unsigned short key2;    // key = key1 << 16 | key2
+ushort key2;    // key = key1 << 16 | key2
 ]]
 
 r:idstring("RTSW")
@@ -73,7 +53,7 @@ io.write(string.format("-> 0x%08X\n", magic))
 r:seek(10)
 
 
-local count1 = bit6()
+local count1 = bit6(r)
 print("block 1, count = " .. count1, count1 * 12 .. " bytes")
 
 local t1 = {}
@@ -85,7 +65,7 @@ for i = 1, count1 do
 end
 
 
-local count2 = bit6()
+local count2 = bit6(r)
 print("block 2, count = " .. count2, count2 * 8 .. " bytes")
 
 local t2 = {}
@@ -96,7 +76,7 @@ for i = 1, count2 do
 end
 
 
-local count3 = bit6()
+local count3 = bit6(r)
 print("block 3, count = " .. count3, count3 * 2 .. " bytes")
 
 local str_start = r:pos()

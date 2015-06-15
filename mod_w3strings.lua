@@ -14,7 +14,27 @@ local keys = {
 
 function get_key(key)
     if key ~= 0 then
-        return keys[key][1]
+        return keys[key][1], keys[key][2]
     end
-    return 0
+    return 0, "no xor"
+end
+
+function bit6(reader)
+    local result, shift, b, i = 0, 0, 0, 1
+    repeat
+        b = reader:uint8()
+        if b == 128 then return 0 end
+        local s = 6
+        local mask = 255
+        if b > 127 then
+            mask = 127
+            s = 7
+        elseif b > 63 then
+            mask = 63
+        end
+        result = result | ((b & mask) << shift)
+        shift = shift + s
+        i = i + 1
+    until (b < 64) or (i == 3 and b < 128)
+    return result
 end
