@@ -7,6 +7,11 @@
 
 ### инструкции ;)
 
+#### inspect_w3speech.lua
+````
+lua inspect_w3speech.lua path_to.w3speech [output_dir [debug]]
+````
+
 #### inspect_w3strings.lua
 ````
 lua inspect_w3strings.lua path_to.w3.strings [output_file [debug]]
