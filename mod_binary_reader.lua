@@ -36,58 +36,71 @@ function BinaryReader:jmp(pos, off)
 end
 
 function BinaryReader:uint8()  -- unsigned byte
-    return string.unpack("B", self.f_handle:read(1))
+    local u8 = string.unpack("B", self.f_handle:read(1))
+    return u8
 end
 
 function BinaryReader:sint8()  -- signed byte
-    return string.unpack("b", self.f_handle:read(1))
+    local s8 = string.unpack("b", self.f_handle:read(1))
+    return s8
 end
 
 function BinaryReader:uint16(endian_big)  -- unsigned short
+    local u16
     if endian_big then
-        return string.unpack(">H", self.f_handle:read(2))
+        u16 = string.unpack(">H", self.f_handle:read(2))
     else
-        return string.unpack("<H", self.f_handle:read(2))
+        u16 = string.unpack("<H", self.f_handle:read(2))
     end
+    return u16
 end
 
 function BinaryReader:sint16(endian_big)  -- signed short
+    local s16
     if endian_big then
-        return string.unpack(">h", self.f_handle:read(2))
+        s16 = string.unpack(">h", self.f_handle:read(2))
     else
-        return string.unpack("<h", self.f_handle:read(2))
+        s16 = string.unpack("<h", self.f_handle:read(2))
     end
+    return s16
 end
 
 function BinaryReader:uint32(endian_big)  -- unsigned integer
+    local u32
     if endian_big then
-        return string.unpack(">I", self.f_handle:read(4))
+        u32 = string.unpack(">I", self.f_handle:read(4))
     else
-        return string.unpack("<I", self.f_handle:read(4))
+        u32 = string.unpack("<I", self.f_handle:read(4))
     end
+    return u32
 end
 
 function BinaryReader:sint32(endian_big)  -- signed integer
+    local s32
     if endian_big then
-        return string.unpack(">i", self.f_handle:read(4))
+        s32 =  string.unpack(">i", self.f_handle:read(4))
     else
-        return string.unpack("<i", self.f_handle:read(4))
+        s32 =  string.unpack("<i", self.f_handle:read(4))
     end
+    return s32
 end
 
 function BinaryReader:uint64(endian_big)  -- unsigned long long integer
+    local u64
     if endian_big then
-        return string.unpack(">I8", self.f_handle:read(8))
+        u64 = string.unpack(">I8", self.f_handle:read(8))
     else
-        return string.unpack("<I8", self.f_handle:read(8))
+        u64 = string.unpack("<I8", self.f_handle:read(8))
     end
+    return u64
 end
 
 function BinaryReader:sint64(endian_big)  -- signed long long integer
+    local s64
     if endian_big then
-        return string.unpack(">i8", self.f_handle:read(8))
+        s64 = string.unpack(">i8", self.f_handle:read(8))
     else
-        return string.unpack("<i8", self.f_handle:read(8))
+        s64 = string.unpack("<i8", self.f_handle:read(8))
     end
 end
 
@@ -103,19 +116,23 @@ function BinaryReader:hex32(inverse)  -- hex
 end
 
 function BinaryReader:float(endian_big)  -- float
+    local f
     if endian_big then
-        return string.unpack(">f", self.f_handle:read(4))
+        f = string.unpack(">f", self.f_handle:read(4))
     else
-        return string.unpack("<f", self.f_handle:read(4))
+        f = string.unpack("<f", self.f_handle:read(4))
     end
+    return f
 end
 
 function BinaryReader:double(endian_big)
+    local d
     if endian_big then
-        return string.unpack(">d", self.f_handle:read(4))
+        d = string.unpack(">d", self.f_handle:read(4))
     else
-        return string.unpack("<d", self.f_handle:read(4))
+        d = string.unpack("<d", self.f_handle:read(4))
     end
+    return d
 end
 
 function BinaryReader:str(len) -- string
@@ -137,5 +154,5 @@ end
 function BinaryReader:idstring(str)
     local len = string.len(str)
     local tmp = self.f_handle:read(len)
-    assert(str == tmp, "ERROR: " .. tmp .. " != " .. str)
+    assert(str == tmp, "\n\nERROR: " .. tmp .. " != " .. str .. "\n")
 end
