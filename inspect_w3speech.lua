@@ -9,13 +9,13 @@ local r = BinaryReader
 r:open(in_file)
 
 --[[
-char magic[4];      // "RTSW"
-int version;        // 162
-unsigned shory key1;
+char magic[4];          // "CPSW"
+int version;            // 162
+unsigned short key1;
 
 bit6 count;
 {
-    uint id;        // ^key
+    uint id;            // ^key
     uint zero;
     uint wave_offset;   // absolute
     uint zero;          //
@@ -62,10 +62,10 @@ table.sort(h, function(a, b) return a.id < b.id end)
 io.write("OK\n")
 
 if debug then
-    io.write("   #:         id wave_off  wave_sz cr2w_off  cr2w_sz\n")
+    io.write("   #:         id   wave_off  wave_sz   cr2w_off  cr2w_sz\n")
     for i = 1, count do
         local t = h[i]
-        io.write(string.format("%4d: 0x%08X %8d %8d %8d %8d\n", 
+        io.write(string.format("%4d: 0x%08x %10d %8d %10d %8d\n", 
                 i, t.id, t.wave_offs, t.wave_size, t.cr2w_offs, t.cr2w_size))
     end
 end
@@ -77,17 +77,21 @@ for i = 1, count do
     
     io.write("saving " .. name .. "(wav|cr2w) ... ")
     w = assert(io.open(name .. "wav", "w+b"))
-    r:seek(t.wave_offs)
-    local sz = r:uint32()
-    assert(t.wave_size == sz + 12)
-    data = r:str(sz)
-    w:write(data)
+    if t.wave_size > 0 then
+        r:seek(t.wave_offs)
+        local sz = r:uint32()
+        assert(t.wave_size == sz + 12)
+        data = r:str(sz)
+        w:write(data)
+    end
     w:close()
     
     w = assert(io.open(name .. "cr2w", "w+b"))
-    r:seek(t.cr2w_offs)
-    data = r:str(t.cr2w_size)
-    w:write(data)
+    if t.cr2w_size > 0 then
+        r:seek(t.cr2w_offs)
+        data = r:str(t.cr2w_size)
+        w:write(data)
+    end
     w:close()
     io.write("OK\n")
 end
