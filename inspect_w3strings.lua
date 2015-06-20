@@ -72,7 +72,7 @@ local t2 = {}
 for i = 1, count2 do
     local unk1 = r:uint32()
     local str_id = r:uint32() ~ magic
-    table.insert(t2, {unk1 = unk1, str_id = str_id})
+    t2[str_id] = unk1
 end
 
 
@@ -112,7 +112,13 @@ for i = 1, count1 do
     local strlen = t1[i].strlen
     local string_key = magic >> 8 & 0xffff  -- (unsigned short)
     
-    w:write(toutf16le(string.format("0x%08x ## ", t1[i].str_id)))
+    w:write(toutf16le(string.format("0x%08x | ", t1[i].str_id)))
+    local unk = t2[t1[i].str_id]
+    if unk ~= nil then
+        w:write(toutf16le(string.format("0x%08x | ", unk)))
+    else
+        w:write(toutf16le("           | "))
+    end
     for j = 1, strlen do
         local b1 = (r:uint8())
         local b2 = (r:uint8())
