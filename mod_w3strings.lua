@@ -13,10 +13,14 @@ local keys = {
 }
 
 function get_key(key)
-    if key ~= 0 then
+    if key == 0 then
+        return 0, "cleartext"
+    elseif keys[key] then
         return keys[key][1], keys[key][2]
+    else
+        assert(false, "\n\n!!! unknown key '" .. string.format("0x%08X", key) .. "' !!!\n")
     end
-    return 0, "no xor"
+
 end
 
 function bit6(reader)
@@ -30,7 +34,9 @@ function bit6(reader)
             mask = 127
             s = 7
         elseif b > 63 then
-            mask = 63
+            if i == 1 then
+                mask = 63
+            end
         end
         result = result | ((b & mask) << shift)
         shift = shift + s
