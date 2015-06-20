@@ -2,6 +2,9 @@ local zlib = require("zlib")
 require("mod_binary_reader")
 require("mod_dds_header")
 
+local WINDOWS = (package.config:sub(1,1) == "\\") or false
+local SEPPERATOR = WINDOWS and "\\" or "/"
+
 local in_file = assert(arg[1], "no input")
 local out_path = arg[2] or "."
 local with_mips = arg[3] or false
@@ -112,7 +115,7 @@ for i = 1, texture_num do
     -- create dds header
     dds:new()
 
-    local w = assert(io.open(out_path .. "\\" .. name .. ".(" .. i .. ").dds", "w+b"))
+    local w = assert(io.open(out_path .. SEPPERATOR .. name .. ".(" .. i .. ").dds", "w+b"))
 
     -- check for cube
     local cubemap = (b[16] == 3 or b[16] == 0) and (b[10] == 6)

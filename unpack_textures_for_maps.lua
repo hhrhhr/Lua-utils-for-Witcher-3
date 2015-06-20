@@ -3,6 +3,7 @@ require("mod_binary_reader")
 require("mod_dds_header")
 
 local WINDOWS = (package.config:sub(1,1) == "\\") or false
+local SEPPERATOR = WINDOWS and "\\" or "/"
 
 local in_file = assert(arg[1], "no input")
 local out_path = arg[2] or "."
@@ -155,7 +156,8 @@ for i = 1, texture_num do
     local header = dds:generate(b[7], b[8], b[9], fmt, b[6], cubemap, depth, nil)
 
 --    local w = assert(io.open(out_path.."\\"..name .. ".("..i..").dds", "w+b"))
-    local w = assert(io.open(out_path .. "\\" .. name .. ".dds", "w+b"))
+    name = WINDOWS and name or string.gsub(name, "\\", "/")
+    local w = assert(io.open(out_path .. SEPPERATOR .. name .. ".dds", "w+b"))
     w:write(header)
 
     local function read_save_chunk(offset)
