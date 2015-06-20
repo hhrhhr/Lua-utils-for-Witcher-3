@@ -8,7 +8,7 @@ local in_file = assert(arg[1], "no input")
 local out_path = arg[2] or "."
 --local with_mips = arg[3] or false
 local with_mips = false
-local filter = arg[3] or ""
+local filter = arg[3] or "tile*%dx*%d"
 
 
 local r = BinaryReader
@@ -154,8 +154,8 @@ for i = 1, texture_num do
     -- width, height, mips, fmt, bpp, cubemap, depth, normal
     local header = dds:generate(b[7], b[8], b[9], fmt, b[6], cubemap, depth, nil)
 
---    local w = assert(io.open(out_path.."\\"..name .. ".("..i..").dds", "w+b"))
-    local w = assert(io.open(out_path .. "\\" .. name .. ".dds", "w+b"))
+--    local w = assert(io.open(out_path.."/"..name .. ".("..i..").dds", "w+b"))
+    local w = assert(io.open(out_path .. "/" .. name .. ".dds", "w+b"))
     w:write(header)
 
     local function read_save_chunk(offset)

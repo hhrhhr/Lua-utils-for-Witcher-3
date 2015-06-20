@@ -112,7 +112,7 @@ for i = 1, texture_num do
     -- create dds header
     dds:new()
 
-    local w = assert(io.open(out_path .. "\\" .. name .. ".(" .. i .. ").dds", "w+b"))
+    local w = assert(io.open(out_path .. "/" .. name .. ".(" .. i .. ").dds", "w+b"))
 
     -- check for cube
     local cubemap = (b[16] == 3 or b[16] == 0) and (b[10] == 6)

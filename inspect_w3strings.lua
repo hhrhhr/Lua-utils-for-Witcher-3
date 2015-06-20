@@ -2,7 +2,7 @@ require("mod_binary_reader")
 require("mod_w3strings")
 
 local in_file = assert(arg[1], "no input")
-local out_file = arg[2] or ".\\strings_utf16le.txt"
+local out_file = arg[2] or "./strings_utf16le.txt"
 local debug = arg[3] or false
 
 local r = BinaryReader
