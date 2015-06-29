@@ -421,9 +421,10 @@ function CR2W_type.String()
 end
 
 function CR2W_type.StringAnsi()
-    local u32 = r:uint32()
+    local len = r:uint8()
 
-    local val = r:str()
+    local val = r:str(len)
+    val = string.sub(val, 1, len-1)     -- cut \x00
     val = string.gsub(val, "\\", "/")
     io.write("\"" .. val .. "\"")
 end
