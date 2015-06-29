@@ -229,7 +229,7 @@ local function read_unknown_bytes(size, typ)
     for i = 1, sz do
         local b = r:uint8()
         table.insert(hex, string.format("%02X", b))
-        if b < 32 or b > 239 then b = 46 end
+        if b < 32 or b > 126 then b = 46 end
         table.insert(str, string.char(b))
     end
     
@@ -326,10 +326,9 @@ local function read_type(var, separator)
 
     -- skip big data 
     if var == "flatCompiledData" then
-        io.write("{},\t-- !!! skip " .. size .. " bytes (" .. typ .. ")\n")
-        tab()
-        io.write("-- ")
+        io.write("{},\t--[[ !!! skip " .. size .. " bytes (" .. typ .. ")\n")
         read_unknown_bytes(size)
+        io.write("--]]")
     else
         if not parse_type(typ, separator) then
             read_value(typ, size, separator)
