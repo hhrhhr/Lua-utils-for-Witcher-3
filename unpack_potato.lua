@@ -41,7 +41,7 @@ for i = 1, file_num do
     local unk5 = r:uint32()
     local zero = r:str(16)  -- 00 00 00 ...
     local unk6 = r:uint32()
-    t.pack = r:uint32()     -- 0 - not packed, 1 - zlib, 5 - LZ??
+    t.pack = r:uint32()     -- 0 - not packed, 1 - zlib, 2, 3 - doboz, 4, 5 - LZ
 
     if not RW then
         print(i, t.size, t.zsize, t.offs, t.pack, t.name)
@@ -105,9 +105,9 @@ for i = 1, file_num do
         assert(f.zsize == bytes_in)
         assert(f.size == bytes_out)
     elseif f.pack == 4 or f.pack == 5 then
-        print("LZ?? chunk, copy as is: " .. f.name)
+        print("(" .. f.pack .. ") LZ4 chunk, copy as is: " .. f.name)
     else
-        print("unknown chunk, copy as is: " .. f.name)
+        print("(" .. f.pack .. ") doboz chunk, copy as is: " .. f.name)
     end
     w:write(data)
     w:close()
