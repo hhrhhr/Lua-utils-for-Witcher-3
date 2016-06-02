@@ -42,6 +42,19 @@ for /l %%i in (0 1 16) do (
         echo.
     )
 )
+
+    if exist "%w3dir%\DLC\ep1\content\%lang%.w3strings" (
+        echo %lang% ep1
+        lua inspect_w3strings.lua "%w3dir%\DLC\ep1\content\%lang%.w3strings" "%outdir%\ep1_%lang%.txt"
+        echo.
+    )
+
+    if exist "%w3dir%\DLC\bob\content\%lang%.w3strings" (
+        echo %lang% bob
+        lua inspect_w3strings.lua "%w3dir%\DLC\bob\content\%lang%.w3strings" "%outdir%\bob_%lang%.txt"
+        echo.
+    )
+
 goto eof
 
 :usage
