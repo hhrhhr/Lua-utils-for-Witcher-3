@@ -39,7 +39,8 @@ local count = bit6(r)
 local h = {}
 for i = 1, count do
     local t = {}
-    t.id        = r:uint32(); assert(0 == r:uint32())
+    t.id        = r:uint32(); -- assert(0 == r:uint32())
+    t.id_high   = r:uint32(); -- appeared in Blood&Wine
     t.wave_offs = r:uint32(); assert(0 == r:uint32())
     t.wave_size = r:uint32(); assert(0 == r:uint32())
     t.cr2w_offs = r:uint32(); assert(0 == r:uint32())
@@ -62,11 +63,11 @@ table.sort(h, function(a, b) return a.id < b.id end)
 io.write("OK\n")
 
 if debug then
-    io.write("   #:         id   wave_off  wave_sz   cr2w_off  cr2w_sz\n")
+    io.write("   #:         id    id_high wave_off    wave_sz   cr2w_off  cr2w_sz\n")
     for i = 1, count do
         local t = h[i]
-        io.write(string.format("%4d: 0x%08x %10d %8d %10d %8d\n", 
-                i, t.id, t.wave_offs, t.wave_size, t.cr2w_offs, t.cr2w_size))
+        io.write(string.format("%4d: 0x%08x 0x%08x %10d %8d %10d %8d\n", 
+                i, t.id, t.id_high, t.wave_offs, t.wave_size, t.cr2w_offs, t.cr2w_size))
     end
 end
 
